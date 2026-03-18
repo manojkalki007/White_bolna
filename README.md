@@ -61,5 +61,42 @@ ngrok http 4000
 - ✅ Agent templates
 - ✅ Cogniflow white-label branding
 
+
 ## License
 MIT
+
+---
+
+## 📂 What's in the Repo
+
+```
+White_cogniflow/
+├── backend/                         # Node.js + Express + Prisma
+│   ├── src/
+│   │   ├── lib/smallestai.ts        # ✅ Fixed API URL + call/agent paths
+│   │   ├── routes/agents.ts         # ✅ Fixed /agent (singular)
+│   │   ├── routes/kb.ts             # ✅ Fixed /knowledgebase
+│   │   ├── routes/auth.ts           # JWT register/login/me
+│   │   ├── routes/campaigns.ts      # CSV upload + call launch
+│   │   ├── routes/analytics.ts      # Real DB stats
+│   │   └── middleware/auth.ts       # JWT guard
+│   ├── prisma/schema.prisma         # Full DB schema
+│   └── .env.example                 # Safe template (no secrets)
+│
+├── frontend/                        # Next.js 16 + Tailwind
+│   ├── app/
+│   │   ├── login/page.tsx           # Auth UI (Sign In / Register)
+│   │   ├── analytics/page.tsx       # Live data dashboard
+│   │   ├── kb/page.tsx              # Knowledge Base CRUD
+│   │   └── campaigns/page.tsx       # Campaign management
+│   ├── components/layout/
+│   │   ├── Sidebar.tsx              # Cogniflow branding + user footer
+│   │   ├── Header.tsx               # Org name + user dropdown
+│   │   └── AppShell.tsx             # Auth-aware layout routing
+│   └── providers/
+│       ├── AuthProvider.tsx         # JWT context (login/register/logout)
+│       └── ReactQueryProvider.tsx   # React Query setup
+│
+├── .gitignore                       # node_modules, .env, dist excluded
+└── README.md                        # Full setup docs
+```
