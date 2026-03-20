@@ -13,6 +13,7 @@ import numbersRoutes from './routes/numbers';
 import audiencesRoutes from './routes/audiences';
 import authRoutes from './routes/auth';
 import kbRoutes from './routes/kb';
+import adminRoutes from './routes/admin';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/numbers', numbersRoutes);
 app.use('/api/audiences', audiencesRoutes);
 app.use('/api/kb', kbRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((_req: Request, _res: Response, next: NextFunction) => {

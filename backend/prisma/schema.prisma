@@ -44,12 +44,44 @@ model Organization {
   name     String
   slug     String @unique
 
+  // ── Per-org Smallest.ai credentials ───────────────────────
+  // If set, overrides the global .env key for this org's API calls
+  smallestAiApiKey  String?   // encrypted in prod
+  smallestAiBaseUrl String?   // optional override
+
+  // ── Plan / billing tier ────────────────────────────────────
+  plan     OrgPlan  @default(STARTER)
+  isActive Boolean  @default(true)
+
+  // ── CRM integration ────────────────────────────────────────
+  crmType          CrmType? // hubspot | salesforce | none
+  crmAccessToken   String?  // OAuth token, encrypted in prod
+  crmRefreshToken  String?
+  crmInstanceUrl   String?  // for Salesforce
+
+  // ── Branding (white-label) ─────────────────────────────────
+  logoUrl       String?
+  primaryColor  String?  @default("#0d9488") // teal-600
+  brandName     String?  // override "Cogniflow" per client
+
   users      User[]
   campaigns  Campaign[]
   contacts   Contact[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum OrgPlan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum CrmType {
+  HUBSPOT
+  SALESFORCE
+  NONE
 }
 
 // ─────────────────────────────────────────────

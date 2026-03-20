@@ -10,6 +10,7 @@ import {
   BarChart,
   Bot,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '../ui';
 import { useAuth } from '@/providers/AuthProvider';
@@ -105,6 +106,32 @@ export function Sidebar() {
               </div>
             </div>
           ))}
+
+          {/* Super Admin link — only visible to SUPER_ADMIN */}
+          {user?.role === 'SUPER_ADMIN' && (
+            <div>
+              <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Platform</h3>
+              <div className="mt-2">
+                <Link
+                  href="/admin"
+                  className={cn(
+                    pathname.startsWith('/admin')
+                      ? 'bg-teal-50 text-teal-700'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900',
+                    'group flex items-center rounded-md px-3 py-2 text-sm font-medium'
+                  )}
+                >
+                  <ShieldCheck
+                    className={cn(
+                      pathname.startsWith('/admin') ? 'text-teal-700' : 'text-gray-400 group-hover:text-gray-500',
+                      'mr-3 shrink-0 h-5 w-5'
+                    )}
+                  />
+                  Super Admin
+                </Link>
+              </div>
+            </div>
+          )}
         </nav>
       </div>
 

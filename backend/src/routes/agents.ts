@@ -1,15 +1,28 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import asyncHandler from 'express-async-handler';
-import smallestAI from '../lib/smallestai';
+import { requireAuth, AuthRequest } from '../middleware/auth';
+import { getOrgClient } from '../lib/smallestai';
+import prisma from '../lib/prisma';
 
 const router = Router();
 
-// GET /api/agents — list all agents from Smallest.ai
+// All agent routes require auth so we can use the org's API key
+router.use(requireAuth);
+
+async function getOrgFromReq(req: AuthRequest) {
+  return prisma.organization.findUniqueOrThrow({
+    where: { id: req.user!.organizationId },
+    select: { smallestAiApiKey: true, smallestAiBaseUrl: true },
+  });
+}
+
+// GET /api/agents — list all agents for this org's Smallest.ai workspace
 router.get(
   '/',
-  asyncHandler(async (_req: Request, res: Response) => {
-    const response = await smallestAI.get('/agent');
-    // Smallest.ai returns { status, data: { agents, totalCount, ... } }
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const org = await getOrgFromReq(req);
+    const client = getOrgClient(org);
+    const response = await client.get('/agent');
     const agents = response.data?.data?.agents ?? response.data?.data ?? [];
     res.json({ success: true, data: agents });
   })
@@ -18,8 +31,10 @@ router.get(
 // GET /api/agents/:id — get a single agent
 router.get(
   '/:id',
-  asyncHandler(async (req: Request, res: Response) => {
-    const response = await smallestAI.get(`/agent/${req.params.id}`);
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const org = await getOrgFromReq(req);
+    const client = getOrgClient(org);
+    const response = await client.get(`/agent/${req.params.id}`);
     res.json({ success: true, data: response.data?.data ?? response.data });
   })
 );
