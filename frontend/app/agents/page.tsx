@@ -3,16 +3,15 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Spinner } from '@/components/ui';
-import { Bot, Mic, Globe, Settings2 } from 'lucide-react';
+import { Bot, Mic, Globe } from 'lucide-react';
 
 interface Agent {
-  id: string;
+  _id: string;
   name: string;
-  type: string;
-  language?: string;
-  voice?: string;
+  workflowType?: string;
+  language?: { default?: string } | string;
+  synthesizer?: { voiceConfig?: { voiceId?: string } };
   status?: string;
-  created_at?: string;
 }
 
 function useAgents() {
@@ -32,22 +31,11 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agents</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            AI voice agents configured in your Smallest.ai workspace.
-          </p>
-        </div>
-        <a
-          href="https://app.smallest.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-md bg-teal-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 transition-colors"
-        >
-          <Settings2 className="h-4 w-4" />
-          Manage in Atoms
-        </a>
+      <div className="border-b pb-4">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agents</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          AI voice agents configured in your Smallest.ai workspace.
+        </p>
       </div>
 
       {isLoading ? (
@@ -73,9 +61,12 @@ export default function AgentsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((agent) => (
+          {agents.map((agent: Agent) => {
+            const agentLang = typeof agent.language === 'object' ? agent.language?.default : agent.language;
+            const agentVoice = agent.synthesizer?.voiceConfig?.voiceId ?? 'Lightning';
+            return (
             <div
-              key={agent.id}
+              key={agent._id}
               className="bg-white rounded-lg shadow ring-1 ring-gray-200 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
@@ -85,7 +76,7 @@ export default function AgentsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{agent.name}</p>
-                    <p className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{agent.id}</p>
+                    <p className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{agent._id}</p>
                   </div>
                 </div>
                 <span
@@ -102,21 +93,22 @@ export default function AgentsPage() {
               <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
                 <div className="flex items-center gap-1">
                   <Globe className="h-3.5 w-3.5" />
-                  {agent.language ?? 'English'}
+                  {agentLang ?? 'English'}
                 </div>
                 <div className="flex items-center gap-1">
                   <Mic className="h-3.5 w-3.5" />
-                  {agent.voice ?? 'Lightning'}
+                  {agentVoice}
                 </div>
               </div>
 
               <div className="border-t pt-3">
                 <p className="text-xs text-gray-400">
-                  Type: <span className="font-medium text-gray-600">{agent.type ?? 'Single Prompt'}</span>
+                  Type: <span className="font-medium text-gray-600">{agent.workflowType ?? 'Single Prompt'}</span>
                 </p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

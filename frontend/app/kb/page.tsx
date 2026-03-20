@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Spinner } from '@/components/ui';
-import { Book, FileText, ExternalLink, Trash2, Plus, Globe, Upload } from 'lucide-react';
+import { Book, FileText, Trash2, Plus, Globe, Upload } from 'lucide-react';
 import { useState } from 'react';
 
 interface KnowledgeBase {
@@ -74,15 +74,6 @@ export default function KnowledgeBasePage() {
             <Plus className="h-4 w-4" />
             New KB
           </button>
-          <a
-            href="https://app.smallest.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Manage in Atoms
-          </a>
         </div>
       </div>
 

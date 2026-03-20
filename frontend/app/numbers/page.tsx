@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Spinner } from '@/components/ui';
-import { Phone, ExternalLink, MapPin, ArrowRight } from 'lucide-react';
+import { Phone, MapPin, ArrowRight } from 'lucide-react';
 
 interface PhoneNumber {
   id: string;
@@ -30,22 +30,11 @@ export default function NumbersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Phone Numbers</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Phone numbers rented or imported in your Smallest.ai workspace.
-          </p>
-        </div>
-        <a
-          href="https://app.smallest.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Manage in Atoms
-        </a>
+      <div className="border-b pb-4">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Phone Numbers</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Phone numbers rented or imported in your Smallest.ai workspace.
+        </p>
       </div>
 
       {isLoading ? (

@@ -8,10 +8,7 @@ import {
   Briefcase,
   Activity,
   BarChart,
-  Settings,
   Bot,
-  Plug,
-  Code,
   LogOut,
 } from 'lucide-react';
 import { cn } from '../ui';
@@ -43,9 +40,7 @@ const navGroups = [
   {
     title: 'Settings',
     items: [
-      { name: 'Webhook', href: '/settings/webhook', icon: Settings },
-      { name: 'Integrations', href: '/settings/integrations', icon: Plug },
-      { name: 'Developers', href: '/settings/developers', icon: Code },
+      { name: 'Integrations', href: '/settings/integrations', icon: BarChart },
     ],
   },
 ];
