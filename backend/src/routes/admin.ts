@@ -71,13 +71,42 @@ router.get(
         primaryColor: true,
         logoUrl: true,
         crmType: true,
-        // Never return API keys in list view
-        smallestAiApiKey: false,
         createdAt: true,
         _count: { select: { users: true, campaigns: true } },
       },
     });
-    res.json({ success: true, data: orgs });
+
+    // Pull call stats per org via campaigns → callLogs aggregation
+    const callStats = await prisma.callLog.groupBy({
+      by: ['campaignId'],
+      _count: { id: true },
+      _sum: { duration: true },
+    });
+
+    // Map campaignId → org
+    const campaigns = await prisma.campaign.findMany({
+      select: { id: true, organizationId: true },
+    });
+    const campaignOrgMap: Record<string, string> = {};
+    for (const c of campaigns) campaignOrgMap[c.id] = c.organizationId;
+
+    // Aggregate per org
+    const orgCallMap: Record<string, { calls: number; durationSec: number }> = {};
+    for (const row of callStats) {
+      const orgId = campaignOrgMap[row.campaignId];
+      if (!orgId) continue;
+      if (!orgCallMap[orgId]) orgCallMap[orgId] = { calls: 0, durationSec: 0 };
+      orgCallMap[orgId].calls += row._count.id;
+      orgCallMap[orgId].durationSec += row._sum.duration ?? 0;
+    }
+
+    const enriched = orgs.map((org) => ({
+      ...org,
+      calls: orgCallMap[org.id]?.calls ?? 0,
+      durationMin: Math.round((orgCallMap[org.id]?.durationSec ?? 0) / 60),
+    }));
+
+    res.json({ success: true, data: enriched });
   })
 );
 
