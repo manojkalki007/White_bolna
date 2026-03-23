@@ -60,7 +60,8 @@ export interface InitiateCallPayload {
 }
 
 export interface InitiateCallResponse {
-  callId?: string;
+  call_id?: string;   // snake_case as returned by Smallest.ai API
+  callId?: string;    // camelCase alias (some API versions)
   status?: string;
   [key: string]: unknown;
 }

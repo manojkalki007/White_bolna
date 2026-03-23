@@ -117,28 +117,12 @@ router.post(
         const { [phoneKey]: _p, ...rest } = row;
         const metadata = Object.keys(rest).length ? rest : undefined;
 
-        // Upsert contact
-        const contact = await prisma.contact.upsert({
-          where: {
-            // We use a composite unique field trick via findFirst then create
-            id: 'noop', // workaround — see below
-          },
-          // Because Prisma upsert needs a unique field, use findFirst + create
-          update: {},
-          create: {
-            organizationId,
-            phoneNumber: phone,
-            name: row['Name'] ?? row['name'] ?? null,
-            email: row['Email'] ?? row['email'] ?? null,
-            metadata,
-          },
-        }).catch(async () => {
-          // Fallback: find existing or create
-          const existing = await prisma.contact.findFirst({
-            where: { organizationId, phoneNumber: phone },
-          });
-          if (existing) return existing;
-          return prisma.contact.create({
+        // Find or create contact
+        let contact = await prisma.contact.findFirst({
+          where: { organizationId, phoneNumber: phone },
+        });
+        if (!contact) {
+          contact = await prisma.contact.create({
             data: {
               organizationId,
               phoneNumber: phone,
@@ -147,7 +131,7 @@ router.post(
               metadata,
             },
           });
-        });
+        }
 
         // Create a pending CallLog
         const callLog = await prisma.callLog.create({
@@ -172,10 +156,12 @@ router.post(
         });
 
         // Update CallLog with smallest_ai_call_id
+        // initiateCall() already unwraps res.data, so the call_id is at the top level
+        const callId = callResponse.call_id ?? callResponse.callId;
         await prisma.callLog.update({
           where: { id: callLog.id },
           data: {
-            smallestAiCallId: callResponse.data?.call_id,
+            smallestAiCallId: callId,
             startedAt: new Date(),
           },
         });
