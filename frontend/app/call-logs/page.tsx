@@ -1,214 +1,272 @@
 'use client';
 
 import { useState } from 'react';
-import { useCallLogs } from '@/lib/hooks/useCallLogs';
-import { AudioPlayer } from '@/components/call-logs/AudioPlayer';
-import { StatusBadge, Spinner } from '@/components/ui';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
+import { useAuth } from '@/providers/AuthProvider';
 import { formatDistanceToNow } from 'date-fns';
-import Link from 'next/link';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  Headphones, ChevronDown, ChevronUp, Loader2,
+  Phone, CheckCircle2, XCircle, Clock, Mic2,
+  PhoneMissed, Radio,
+} from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'org_default';
+interface CallLog {
+  id: string;
+  status: string;
+  direction: string;
+  duration: number | null;
+  bolnaCallId?: string;
+  bolnaRecordingUrl?: string;
+  transcript?: string;
+  disconnectReason?: string;
+  avgLatencyMs?: number;
+  creditCost?: number;
+  createdAt: string;
+  contact?: { name?: string; phoneNumber: string };
+  campaign?: { name: string };
+  agent?: { name: string; voiceId?: string };
+}
+
+const STATUS_META: Record<string, { icon: typeof CheckCircle2; color: string; badge: string }> = {
+  COMPLETED: { icon: CheckCircle2, color: '#22c55e', badge: 'badge badge-green'  },
+  FAILED:    { icon: XCircle,      color: '#ef4444', badge: 'badge badge-red'    },
+  IN_CALL:   { icon: Radio,        color: '#3b82f6', badge: 'badge badge-blue'   },
+  NO_ANSWER: { icon: PhoneMissed,  color: '#6b7280', badge: 'badge badge-gray'   },
+  BUSY:      { icon: Phone,        color: '#eab308', badge: 'badge badge-yellow' },
+  INITIATED: { icon: Phone,        color: '#6366f1', badge: 'badge badge-accent' },
+  RINGING:   { icon: Phone,        color: '#f97316', badge: 'badge badge-yellow' },
+  PENDING:   { icon: Clock,        color: '#6b7280', badge: 'badge badge-gray'   },
+};
+
+function fmtDur(s: number | null) {
+  if (s == null) return '—';
+  const m = Math.floor(s / 60); const sec = s % 60;
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
 
 export default function CallLogsPage() {
+  const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useCallLogs({ organizationId: ORG_ID, page });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['call-logs', user?.organizationId, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '20',
+        ...(user?.organizationId ? { organizationId: user.organizationId } : {}),
+      });
+      const { data } = await api.get<{ data: CallLog[]; total: number }>(`/call-logs?${params}`);
+      return data;
+    },
+    refetchInterval: 20_000,
+  });
 
-  const toggleExpand = (id: string) =>
-    setExpandedId((prev) => (prev === id ? null : id));
+  const logs = data?.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-          Call Logs
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Browse all call records, transcripts, and recordings.
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <div>
+        <h1 className="page-title">Call Logs</h1>
+        <p className="page-subtitle">Browse all call records, transcripts, and Bolna latency metrics</p>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center p-12">
-          <Spinner className="h-8 w-8" />
+      {/* ── Table ──────────────────────────────────────────────── */}
+      <div className="card">
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Headphones size={14} color="var(--accent)" />
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Call Records
+            </p>
+            {data?.total != null && (
+              <span className="badge badge-accent">{data.total.toLocaleString()} total</span>
+            )}
+          </div>
         </div>
-      ) : error ? (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          Failed to load call logs.
-        </div>
-      ) : (
-        <>
-          <div className="bg-white shadow ring-1 ring-gray-200 rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Contact', 'Phone', 'Campaign', 'Status', 'Duration', 'Recording', 'Time', ''].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {data?.data.map((log) => (
-                  <>
-                    <tr
-                      key={log.id}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => toggleExpand(log.id)}
-                    >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        {log.contact?.name ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 font-mono whitespace-nowrap">
-                        {log.contact?.phoneNumber}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                        <Link
-                          href={`/campaigns/${log.campaignId}`}
-                          className="text-teal-600 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {log.campaign?.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-sm whitespace-nowrap">
-                        <StatusBadge status={log.status} />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                        {log.duration != null ? `${log.duration}s` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm min-w-[240px]">
-                        {log.recordingUrl ? (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <AudioPlayer url={log.recordingUrl} />
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">No recording</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                        {formatDistanceToNow(new Date(log.createdAt), {
-                          addSuffix: true,
-                        })}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {expandedId === log.id ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </td>
-                    </tr>
 
-                    {/* Expanded transcript row */}
-                    {expandedId === log.id && (
-                      <tr key={`${log.id}-expand`}>
-                        <td
-                          colSpan={8}
-                          className="bg-gray-50 px-8 py-4 text-sm text-gray-700"
-                        >
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                                Transcript
-                              </p>
-                              {log.transcript ? (
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
-                                  {log.transcript}
-                                </p>
-                              ) : (
-                                <p className="text-gray-400 italic text-sm">
-                                  No transcript available.
-                                </p>
-                              )}
-                            </div>
-                            {log.postCallMetrics && (
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+            <Loader2 size={24} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : error ? (
+          <div style={{ padding: 20, color: '#f87171', fontSize: 13 }}>
+            Failed to load call logs.
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                {['Contact', 'Campaign', 'Agent', 'Status', 'Duration', 'Latency', 'Time', ''].map(h => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
+                    No calls yet. Launch a campaign to see call logs.
+                  </td>
+                </tr>
+              ) : (
+                logs.map(log => {
+                  const meta = STATUS_META[log.status] ?? STATUS_META.INITIATED;
+                  const isExpanded = expandedId === log.id;
+
+                  return (
+                    <>
+                      <tr
+                        key={log.id}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                      >
+                        <td>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>
+                              {log.contact?.name ?? 'Unknown'}
+                            </p>
+                            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              {log.contact?.phoneNumber}
+                            </p>
+                          </div>
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {log.campaign?.name ?? <span style={{ color: 'var(--text-muted)' }}>Direct</span>}
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {log.agent?.name ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td><span className={meta.badge}>{log.status}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <Clock size={11} style={{ color: 'var(--text-muted)' }} />
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 12 }}>
+                              {fmtDur(log.duration)}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          {log.avgLatencyMs != null ? (
+                            <span style={{
+                              fontSize: 11, fontWeight: 600,
+                              color: log.avgLatencyMs > 500 ? '#f87171' : log.avgLatencyMs > 300 ? '#fbbf24' : '#4ade80',
+                            }}>
+                              {log.avgLatencyMs}ms
+                            </span>
+                          ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                        </td>
+                        <td style={{ color: 'var(--text-muted)' }}>
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </td>
+                      </tr>
+
+                      {/* Expanded row */}
+                      {isExpanded && (
+                        <tr key={`${log.id}-expand`}>
+                          <td colSpan={8} style={{ background: 'var(--bg-elevated)', padding: '16px 24px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+
+                              {/* Transcript */}
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                                  Post-Call Metrics
+                                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                                  Transcript
                                 </p>
-                                <div className="rounded-md bg-white ring-1 ring-gray-200 p-3 text-sm space-y-1">
-                                  {Object.entries(
-                                    log.postCallMetrics as Record<string, unknown>
-                                  ).map(([k, v]) => (
-                                    <div
-                                      key={k}
-                                      className="flex justify-between gap-4"
-                                    >
-                                      <span className="text-gray-500 font-medium">
-                                        {k}
-                                      </span>
-                                      <span className="text-gray-900 font-semibold">
-                                        {String(v)}
-                                      </span>
+                                {log.transcript ? (
+                                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}>
+                                    {log.transcript}
+                                  </p>
+                                ) : (
+                                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    No transcript available
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Metadata */}
+                              <div>
+                                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                                  Call Details
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  {[
+                                    { label: 'Bolna Call ID', value: log.bolnaCallId ?? '—' },
+                                    { label: 'Disconnect Reason', value: log.disconnectReason ?? '—' },
+                                    { label: 'Credit Cost', value: log.creditCost != null ? `${log.creditCost} min` : '—' },
+                                    { label: 'Avg Latency', value: log.avgLatencyMs != null ? `${log.avgLatencyMs}ms` : '—' },
+                                    { label: 'Direction', value: log.direction ?? 'outbound' },
+                                  ].map(row => (
+                                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                      <span style={{ color: 'var(--text-muted)' }}>{row.label}</span>
+                                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{row.value}</span>
                                     </div>
                                   ))}
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                          {log.disconnectReason && (
-                            <p className="mt-3 text-xs text-gray-500">
-                              Disconnect reason:{' '}
-                              <span className="font-medium">
-                                {log.disconnectReason}
-                              </span>
-                            </p>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))}
-                {data?.data.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="py-10 text-center text-sm text-gray-500"
-                    >
-                      No call logs yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
 
-          {/* Pagination */}
-          {data && data.total > 20 && (
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <span>
-                Showing {(page - 1) * 20 + 1}–
-                {Math.min(page * 20, data.total)} of {data.total}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="rounded px-3 py-1 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={page * 20 >= data.total}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="rounded px-3 py-1 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
+                                {/* Recording */}
+                                {log.bolnaRecordingUrl && (
+                                  <div style={{ marginTop: 12 }}>
+                                    <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                      Recording
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <Mic2 size={13} color="var(--accent)" />
+                                      <audio controls style={{ height: 28, flex: 1 }}>
+                                        <source src={log.bolnaRecordingUrl} />
+                                      </audio>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Pagination */}
+        {data && data.total > 20 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 20px', borderTop: '1px solid var(--border)',
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, data.total)} of {data.total}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="btn btn-secondary btn-sm"
+                style={{ opacity: page === 1 ? 0.4 : 1 }}
+              >
+                Previous
+              </button>
+              <button
+                disabled={page * 20 >= data.total}
+                onClick={() => setPage(p => p + 1)}
+                className="btn btn-secondary btn-sm"
+                style={{ opacity: page * 20 >= data.total ? 0.4 : 1 }}
+              >
+                Next
+              </button>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

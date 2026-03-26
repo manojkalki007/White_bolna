@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getOrgClient } from '../lib/smallestai';
+import { getOrgClient } from '../lib/bolna';
 import prisma from '../lib/prisma';
 
 const router = Router();
@@ -10,11 +10,11 @@ router.use(requireAuth);
 async function getOrgFromReq(req: AuthRequest) {
   return prisma.organization.findUniqueOrThrow({
     where: { id: req.user!.organizationId },
-    select: { smallestAiApiKey: true, smallestAiBaseUrl: true },
+    select: { bolnaApiKey: true, bolnaBaseUrl: true },
   });
 }
 
-// GET /api/kb
+// GET /api/kb — list knowledge bases
 router.get(
   '/',
   asyncHandler(async (req: AuthRequest, res: Response) => {

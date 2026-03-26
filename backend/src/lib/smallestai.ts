@@ -13,7 +13,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 const DEFAULT_BASE_URL =
-  process.env.SMALLEST_AI_BASE_URL ?? 'https://atoms-api.smallest.ai/api/v1';
+  process.env.SMALLEST_AI_BASE_URL ?? 'https://api.smallest.ai/atoms/v1';
 const DEFAULT_API_KEY = process.env.SMALLEST_AI_API_KEY ?? '';
 
 // ─── Default singleton (uses .env) ───────────────────────────────────────────

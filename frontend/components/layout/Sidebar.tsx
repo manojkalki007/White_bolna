@@ -3,45 +3,40 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Phone,
-  Megaphone,
-  Briefcase,
-  Activity,
-  BarChart,
-  Bot,
-  LogOut,
-  ShieldCheck,
+  LayoutDashboard, Bot, Megaphone, Phone, BarChart2,
+  FileText, Users, ShieldCheck, Zap, LogOut, Settings,
+  BookOpen, Headphones,
 } from 'lucide-react';
-import { cn } from '../ui';
 import { useAuth } from '@/providers/AuthProvider';
 
 const navGroups = [
   {
-    title: 'Build',
+    title: 'Platform',
     items: [
-      { name: 'Agents', href: '/agents', icon: Bot },
-      { name: 'Knowledge Base', href: '/kb', icon: Briefcase },
+      { name: 'Dashboard',    href: '/analytics',  icon: LayoutDashboard },
+      { name: 'Agents',       href: '/agents',     icon: Bot },
+      { name: 'Campaigns',    href: '/campaigns',  icon: Megaphone },
     ],
   },
   {
-    title: 'Deploy',
+    title: 'Manage',
     items: [
-      { name: 'Phone Numbers', href: '/numbers', icon: Phone },
-      { name: 'Campaigns', href: '/campaigns', icon: Megaphone },
-      { name: 'Audiences', href: '/audiences', icon: Briefcase },
+      { name: 'Phone Numbers', href: '/numbers',   icon: Phone },
+      { name: 'Audiences',     href: '/audiences', icon: Users },
+      { name: 'Knowledge Base',href: '/kb',        icon: BookOpen },
     ],
   },
   {
     title: 'Observe',
     items: [
-      { name: 'Call Logs', href: '/call-logs', icon: Activity },
-      { name: 'Analytics', href: '/analytics', icon: BarChart },
+      { name: 'Call Logs',    href: '/call-logs',  icon: Headphones },
+      { name: 'Analytics',    href: '/analytics',  icon: BarChart2 },
     ],
   },
   {
-    title: 'Settings',
+    title: 'Account',
     items: [
-      { name: 'Integrations', href: '/settings/integrations', icon: BarChart },
+      { name: 'Settings',     href: '/settings',   icon: Settings },
     ],
   },
 ];
@@ -51,110 +46,93 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
   };
 
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'AT';
+    : 'CF';
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <div className="flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-white pt-5 pb-4">
-      <div className="flex shrink-0 items-center px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-teal-400 text-white font-bold shadow-sm">
-            C
+    <aside className="sidebar">
+      {/* Logo */}
+      <div className="sidebar-logo">
+        <div className="sidebar-logo-icon">
+          <Zap size={16} />
+        </div>
+        <span className="sidebar-logo-text">Cogniflow</span>
+      </div>
+
+      {/* Nav */}
+      <nav className="sidebar-nav">
+        {navGroups.map((group) => (
+          <div key={group.title}>
+            <div className="sidebar-group-label">{group.title}</div>
+            {group.items.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`sidebar-item ${isActive(item.href) ? 'active' : ''}`}
+              >
+                <item.icon size={15} />
+                {item.name}
+              </Link>
+            ))}
           </div>
-          <span className="text-xl font-bold text-gray-900 tracking-tight">Cogniflow</span>
-        </Link>
-      </div>
+        ))}
 
-      <div className="mt-8 flex flex-col flex-grow">
-        <nav className="flex-1 space-y-6 px-3" aria-label="Sidebar">
-          {navGroups.map((group) => (
-            <div key={group.title}>
-              <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                {group.title}
-              </h3>
-              <div className="mt-2 space-y-1">
-                {group.items.map((item) => {
-                  const isActive = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        isActive
-                          ? 'bg-teal-50 text-teal-700'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900',
-                        'group flex items-center rounded-md px-3 py-2 text-sm font-medium'
-                      )}
-                    >
-                      <item.icon
-                        className={cn(
-                          isActive ? 'text-teal-700' : 'text-gray-400 group-hover:text-gray-500',
-                          'mr-3 shrink-0 h-5 w-5'
-                        )}
-                        aria-hidden="true"
-                      />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+        {/* Super Admin */}
+        {user?.role === 'SUPER_ADMIN' && (
+          <div>
+            <div className="sidebar-group-label">Admin</div>
+            <Link
+              href="/admin"
+              className={`sidebar-item ${isActive('/admin') ? 'active' : ''}`}
+            >
+              <ShieldCheck size={15} />
+              Super Admin
+            </Link>
+          </div>
+        )}
+      </nav>
 
-          {/* Super Admin link — only visible to SUPER_ADMIN */}
-          {user?.role === 'SUPER_ADMIN' && (
-            <div>
-              <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Platform</h3>
-              <div className="mt-2">
-                <Link
-                  href="/admin"
-                  className={cn(
-                    pathname.startsWith('/admin')
-                      ? 'bg-teal-50 text-teal-700'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900',
-                    'group flex items-center rounded-md px-3 py-2 text-sm font-medium'
-                  )}
-                >
-                  <ShieldCheck
-                    className={cn(
-                      pathname.startsWith('/admin') ? 'text-teal-700' : 'text-gray-400 group-hover:text-gray-500',
-                      'mr-3 shrink-0 h-5 w-5'
-                    )}
-                  />
-                  Super Admin
-                </Link>
-              </div>
-            </div>
-          )}
-        </nav>
-      </div>
-
-      {/* User footer */}
-      <div className="mt-auto px-3 pt-4 border-t border-gray-200">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="h-8 w-8 rounded-full bg-teal-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
+      {/* Footer */}
+      <div style={{ padding: '10px', borderTop: '1px solid var(--border)', marginTop: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px' }}>
+          <div
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: 'linear-gradient(135deg, var(--accent), #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
+            }}
+          >
             {initials}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900 truncate">{user?.name ?? '—'}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.organizationName ?? '—'}</p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name ?? '—'}
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.email ?? ''}
+            </p>
           </div>
           <button
             id="sidebar-logout"
             onClick={handleLogout}
             title="Sign out"
-            className="text-gray-400 hover:text-red-500 transition-colors"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 6, transition: 'color 0.15s', flexShrink: 0 }}
+            onMouseOver={e => (e.currentTarget.style.color = '#f87171')}
+            onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut size={15} />
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

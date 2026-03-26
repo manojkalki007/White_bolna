@@ -1,201 +1,129 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Spinner } from '@/components/ui';
-import { Book, FileText, Trash2, Plus, Globe, Upload } from 'lucide-react';
-import { useState } from 'react';
+import { useAuth } from '@/providers/AuthProvider';
+import { BookOpen, Plus, FileText, Search, Loader2, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
-interface KnowledgeBase {
+interface KBDoc {
   id: string;
-  name: string;
-  type?: string;
-  status?: string;
-  documentCount?: number;
-  createdAt?: string;
+  fileName: string;
+  fileType?: string;
+  status: string;
+  createdAt: string;
 }
 
-function useKnowledgeBases() {
-  return useQuery<KnowledgeBase[]>({
-    queryKey: ['kb'],
+const STATUS_BADGE: Record<string, string> = {
+  PROCESSING: 'badge badge-yellow',
+  READY:      'badge badge-green',
+  FAILED:     'badge badge-red',
+};
+
+export default function KBPage() {
+  const { user } = useAuth();
+
+  const { data: docs = [], isLoading } = useQuery<KBDoc[]>({
+    queryKey: ['kb', user?.organizationId],
     queryFn: async () => {
-      try {
-        const { data } = await api.get<{ data: KnowledgeBase[] | { knowledgeBases?: KnowledgeBase[] } }>('/kb');
-        const raw = data.data;
-        return Array.isArray(raw) ? raw : (raw as any).knowledgeBases ?? [];
-      } catch {
-        return [];
-      }
+      const { data } = await api.get<{ data: KBDoc[] }>('/kb');
+      return Array.isArray(data.data) ? data.data : [];
     },
-  });
-}
-
-export default function KnowledgeBasePage() {
-  const { data: kbItems = [], isLoading } = useKnowledgeBases();
-  const queryClient = useQueryClient();
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-
-  const createMutation = useMutation({
-    mutationFn: async (name: string) => {
-      await api.post('/kb', { name });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kb'] });
-      setCreating(false);
-      setNewName('');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/kb/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['kb'] });
-    },
+    refetchInterval: 15_000,
   });
 
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-4 flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Knowledge Base</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Documents and URLs your AI agents reference during calls.
-          </p>
+          <h1 className="page-title">Knowledge Base</h1>
+          <p className="page-subtitle">Upload documents to ground your AI agents with accurate information</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            id="create-kb-button"
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-teal-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New KB
-          </button>
-        </div>
+        <Link href="/kb/upload" className="btn btn-primary">
+          <Plus size={14} /> Upload Document
+        </Link>
       </div>
-
-      {/* Create KB inline form */}
-      {creating && (
-        <div className="bg-white rounded-xl ring-1 ring-teal-300 shadow-sm p-5 flex items-center gap-4">
-          <input
-            id="new-kb-name"
-            type="text"
-            autoFocus
-            placeholder="Knowledge Base name (e.g. Product FAQ)"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') createMutation.mutate(newName); }}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
-          <button
-            onClick={() => createMutation.mutate(newName)}
-            disabled={!newName.trim() || createMutation.isPending}
-            className="bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-60"
-          >
-            {createMutation.isPending ? 'Creating…' : 'Create'}
-          </button>
-          <button onClick={() => setCreating(false)} className="text-gray-400 hover:text-gray-600 text-sm">
-            Cancel
-          </button>
-        </div>
-      )}
 
       {isLoading ? (
-        <div className="flex justify-center p-12">
-          <Spinner className="h-8 w-8" />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Loader2 size={24} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
         </div>
-      ) : kbItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-xl shadow ring-1 ring-gray-200 py-24 gap-4">
-          <Book className="h-14 w-14 text-gray-200" />
-          <div className="text-center">
-            <p className="text-gray-600 font-medium">No Knowledge Bases yet</p>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs">
-              Create one above, then upload PDFs, paste URLs, or type text.
-              Agents will automatically search them during calls.
-            </p>
+      ) : docs.length === 0 ? (
+        <div className="card" style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <BookOpen size={24} color="var(--accent)" />
           </div>
-          <a
-            href="https://app.smallest.ai"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-teal-600 hover:underline text-sm font-medium"
-          >
-            <Globe className="h-4 w-4" />
-            Open Atoms Dashboard →
-          </a>
+          <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            No documents yet
+          </p>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Upload PDFs, DOCs, or TXT files to boost your agents' knowledge
+          </p>
+          <Link href="/kb/upload" className="btn btn-primary">
+            <Plus size={14} /> Upload Document
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {kbItems.map((kb) => (
-            <div
-              key={kb.id}
-              className="bg-white rounded-xl shadow ring-1 ring-gray-200 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                    <Book className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{kb.name}</p>
-                    <p className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{kb.id}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => deleteMutation.mutate(kb.id)}
-                  disabled={deleteMutation.isPending}
-                  className="text-gray-300 hover:text-red-500 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              {kb.documentCount !== undefined && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <FileText className="h-3.5 w-3.5" />
-                  {kb.documentCount} document{kb.documentCount !== 1 ? 's' : ''}
-                </div>
-              )}
-
-              {kb.status && (
-                <span
-                  className={`inline-flex items-center self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    kb.status === 'ready'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-yellow-50 text-yellow-700'
-                  }`}
-                >
-                  {kb.status}
-                </span>
-              )}
-
-              <a
-                href="https://app.smallest.ai"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline mt-auto"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                Upload documents in Atoms
-              </a>
+        <div className="card">
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <BookOpen size={14} color="var(--accent)" />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Documents
+              </p>
+              <span className="badge badge-accent">{docs.length}</span>
             </div>
-          ))}
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                {['Document', 'Type', 'Status', 'Uploaded', 'Actions'].map(h => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map(doc => (
+                <tr key={doc.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                        background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <FileText size={14} color="var(--accent)" />
+                      </div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>
+                        {doc.fileName}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                    {doc.fileType ?? '—'}
+                  </td>
+                  <td>
+                    <span className={STATUS_BADGE[doc.status] ?? 'badge badge-gray'}>
+                      {doc.status}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true })}
+                  </td>
+                  <td>
+                    <button className="btn btn-danger btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Trash2 size={11} /> Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
-      {/* How it works banner */}
-      <div className="rounded-xl bg-blue-50 ring-1 ring-blue-200 p-4 text-sm text-blue-800 flex items-start gap-3">
-        <FileText className="h-5 w-5 mt-0.5 shrink-0 text-blue-500" />
-        <div>
-          <strong>How it works:</strong> Create a Knowledge Base here, then open the Atoms
-          Dashboard to upload PDFs, paste URLs, or type raw text. In your Agent configuration, toggle the KB on — the
-          AI will automatically search for answers during every call.
-        </div>
-      </div>
     </div>
   );
 }

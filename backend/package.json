@@ -1,5 +1,5 @@
 {
-  "name": "ai-telephony-backend",
+  "name": "bolna-voice-ai-backend",
   "version": "1.0.0",
   "description": "AI Telephony SaaS — Express backend",
   "main": "dist/index.js",
@@ -7,13 +7,17 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "seed:admin": "ts-node -e \"require('dotenv/config')\" scripts/upsert-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.11.0",
+    "@supabase/supabase-js": "^2.100.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.6.8",
@@ -36,6 +40,7 @@
     "@types/multer": "^1.4.11",
     "@types/node": "^20.11.30",
     "prisma": "^5.11.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.2"
   }

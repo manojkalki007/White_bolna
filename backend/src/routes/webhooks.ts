@@ -1,149 +1,283 @@
+/**
+ * webhooks.ts
+ *
+ * POST /api/webhooks/bolna — Receives post-call data from Bolna servers.
+ *
+ * Security:
+ *  - HMAC-SHA256 signature verification using BOLNA_WEBHOOK_SECRET env var.
+ *  - All processing is async and non-blocking (responds 200 immediately).
+ *  - Raw payload archived in WebhookEvent for replay/debugging.
+ *
+ * Bolna webhook shape (v1):
+ * {
+ *   event: "call.initiated" | "call.ringing" | "call.started" |
+ *           "call.completed" | "call.failed" | "call.no_answer" | "call.busy"
+ *   data: {
+ *     call_id: string
+ *     status: string
+ *     duration: number          // seconds
+ *     recording_url: string
+ *     transcript: string
+ *     disconnect_reason: string
+ *     latency: {
+ *       avg_ms: number
+ *       p95_ms: number
+ *     }
+ *     post_call_data: {
+ *       sentiment: string
+ *       intent: string
+ *       summary: string
+ *       [key: string]: unknown
+ *     }
+ *   }
+ * }
+ */
+
 import { Router, Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import { createHmac, timingSafeEqual } from 'crypto';
 import prisma from '../lib/prisma';
+import { uploadRecordingFromUrl } from '../lib/storage';
 import { createError } from '../middleware/errorHandler';
 
 const router = Router();
 
-// ─── Signature verification ────────────────────────────────────────────────
-function verifySignature(payload: string, signature: string | undefined): boolean {
-  const secret = process.env.WEBHOOK_SECRET;
+// ─── HMAC Signature Verification ─────────────────────────────────────────────
+function verifyBolnaSignature(
+  rawBody: string,
+  signature: string | undefined
+): boolean {
+  const secret = process.env.BOLNA_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn('[Webhook] WEBHOOK_SECRET not set — skipping verification');
-    return true; // allow in dev without secret
+    console.warn('[Webhook/Bolna] BOLNA_WEBHOOK_SECRET not set — skipping verification in dev');
+    return true;
   }
   if (!signature) return false;
 
-  const expected = createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-
-  // Smallest.ai may send "sha256=<hash>" or just "<hash>"
-  const incoming = signature.startsWith('sha256=')
-    ? signature.slice(7)
-    : signature;
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+  const incoming = signature.startsWith('sha256=') ? signature.slice(7) : signature;
 
   try {
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(incoming));
+    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(incoming, 'hex'));
   } catch {
     return false;
   }
 }
 
-// ─── POST /api/webhooks/smallest ─────────────────────────────────────────────
-// Receives call lifecycle events from Smallest.ai and updates the DB.
-router.post(
-  '/smallest',
-  asyncHandler(async (req: Request, res: Response) => {
-    // Raw body is available because we used express.json() with `verify` in index.ts
-    const rawBody: string = (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
-    const signature = req.headers['x-smallest-signature'] as string | undefined;
+// ─── Bolna event → CallStatus mapping ────────────────────────────────────────
+const EVENT_STATUS_MAP: Record<string, string> = {
+  'call.initiated': 'INITIATED',
+  'call.ringing':   'RINGING',
+  'call.started':   'IN_CALL',
+  'call.completed': 'COMPLETED',
+  'call.failed':    'FAILED',
+  'call.no_answer': 'NO_ANSWER',
+  'call.busy':      'BUSY',
+};
 
-    if (!verifySignature(rawBody, signature)) {
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/webhooks/bolna
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  '/bolna',
+  asyncHandler(async (req: Request, res: Response) => {
+    const rawBody: string =
+      (req as Request & { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+    const signature = req.headers['x-bolna-signature'] as string | undefined;
+
+    // ── Signature check ────────────────────────────────────────────────────
+    if (!verifyBolnaSignature(rawBody, signature)) {
       throw createError('Invalid webhook signature', 401);
     }
 
-    const payload = req.body;
-    console.log('[Webhook] Received event:', JSON.stringify(payload, null, 2));
+    const payload = req.body as Record<string, unknown>;
+    const event = (payload.event as string) ?? 'unknown';
+    const data = (payload.data ?? payload) as Record<string, unknown>;
+    const bolnaCallId = (data.call_id ?? data.callId) as string | undefined;
 
-    // Smallest.ai webhook payload shape (adapt if their schema changes):
-    // {
-    //   event: "call.ended" | "call.started" | "call.failed" | ...
-    //   data: {
-    //     call_id: string
-    //     status: string
-    //     duration: number        // seconds
-    //     recording_url: string
-    //     transcript: string
-    //     disconnect_reason: string
-    //     metrics: { [key]: value }
-    //   }
-    // }
+    console.log(`[Webhook/Bolna] event="${event}" call_id="${bolnaCallId}"`);
 
-    const event: string = payload.event ?? payload.type ?? 'unknown';
-    const data = payload.data ?? payload;
-    const smallestAiCallId: string | undefined = data.call_id ?? data.callId;
+    // ── Archive raw event immediately ──────────────────────────────────────
+    const webhookRecord = await prisma.webhookEvent.create({
+      data: {
+        source: 'bolna',
+        eventType: event,
+        bolnaCallId: bolnaCallId ?? null,
+        payload: payload as any,
+        processed: false,
+      },
+    });
 
-    if (!smallestAiCallId) {
-      console.warn('[Webhook] No call_id in payload — ignoring');
-      return res.status(200).json({ received: true });
+    // ── Respond 200 immediately so Bolna doesn't retry ────────────────────
+    res.status(200).json({ received: true, id: webhookRecord.id });
+
+    // ── Process asynchronously (after response is sent) ───────────────────
+    // This pattern prevents Bolna from timing out waiting for our DB ops.
+    setImmediate(() => processBolnaEvent(webhookRecord.id, event, data, bolnaCallId));
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Async event processor (runs after HTTP response)
+// ─────────────────────────────────────────────────────────────────────────────
+async function processBolnaEvent(
+  webhookId: string,
+  event: string,
+  data: Record<string, unknown>,
+  bolnaCallId: string | undefined
+) {
+  try {
+    if (!bolnaCallId) {
+      console.warn(`[Webhook/Bolna] No call_id in payload, skipping (id=${webhookId})`);
+      await prisma.webhookEvent.update({
+        where: { id: webhookId },
+        data: { processed: true, error: 'No call_id' },
+      });
+      return;
     }
 
-    // Find the associated CallLog
+    // Locate our CallLog
     const callLog = await prisma.callLog.findUnique({
-      where: { smallestAiCallId },
+      where: { bolnaCallId },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            organizationId: true,
+            totalContacts: true,
+            processedCount: true,
+            failedCount: true,
+          },
+        },
+      },
     });
 
     if (!callLog) {
-      // Could be a call initiated outside our system — log and ignore
-      console.warn(`[Webhook] No CallLog found for call_id: ${smallestAiCallId}`);
-      return res.status(200).json({ received: true });
+      console.warn(`[Webhook/Bolna] No CallLog for call_id=${bolnaCallId}`);
+      await prisma.webhookEvent.update({
+        where: { id: webhookId },
+        data: { processed: true, error: 'No matching CallLog' },
+      });
+      return;
     }
 
-    // Map event → CallStatus
-    const statusMap: Record<string, string> = {
-      'call.started': 'IN_CALL',
-      'call.ringing': 'RINGING',
-      'call.ended': 'COMPLETED',
-      'call.failed': 'FAILED',
-      'call.no_answer': 'NO_ANSWER',
-      'call.busy': 'BUSY',
-    };
+    const newStatus = (EVENT_STATUS_MAP[event] ?? callLog.status) as any;
 
-    const newStatus = statusMap[event] ?? callLog.status;
-
-    // Build update payload
-    const updateData: Parameters<typeof prisma.callLog.update>[0]['data'] = {
-      status: newStatus as any,
-      rawWebhookPayload: payload,
+    // ── Build CallLog update data ──────────────────────────────────────────
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      rawWebhookPayload: data,
     };
 
     if (data.duration !== undefined) updateData.duration = Number(data.duration);
-    if (data.recording_url) updateData.recordingUrl = data.recording_url;
-    if (data.transcript) updateData.transcript = data.transcript;
-    if (data.disconnect_reason) updateData.disconnectReason = data.disconnect_reason;
-    if (data.metrics) updateData.postCallMetrics = data.metrics;
+    if (data.recording_url)        updateData.bolnaRecordingUrl = data.recording_url;
+    if (data.transcript)           updateData.transcript = data.transcript;
+    if (data.disconnect_reason)    updateData.disconnectReason = data.disconnect_reason;
 
-    if (event === 'call.started') updateData.startedAt = new Date();
-    if (event === 'call.ended' || event === 'call.failed') {
-      updateData.endedAt = new Date();
+    // Latency metrics
+    const latency = data.latency as Record<string, unknown> | undefined;
+    if (latency) {
+      if (latency.avg_ms !== undefined) updateData.avgLatencyMs = Number(latency.avg_ms);
+      if (latency.p95_ms !== undefined) updateData.p95LatencyMs = Number(latency.p95_ms);
     }
 
+    // Structured post-call analytics
+    if (data.post_call_data) updateData.postCallMetrics = data.post_call_data;
+
+    // Timestamps
+    if (event === 'call.started')    updateData.startedAt = new Date();
+    if (event === 'call.completed' ||
+        event === 'call.failed' ||
+        event === 'call.no_answer' ||
+        event === 'call.busy')       updateData.endedAt = new Date();
+
+    // ── Credit deduction (on call.completed) ──────────────────────────────
+    // Duration arrives in seconds; our credit unit is minutes.
+    const isTerminal = ['call.completed', 'call.failed', 'call.no_answer', 'call.busy'].includes(event);
+
+    if (isTerminal && callLog.campaign?.organizationId) {
+      const durationSec = Number(data.duration ?? 0);
+      const durationMin = durationSec / 60;
+      const CREDIT_RESERVED = 1; // what we reserved at initiation
+
+      updateData.creditCost = durationMin;
+
+      // Reconcile: refund the difference between what was reserved and actual usage
+      const refund = Math.max(0, CREDIT_RESERVED - durationMin);
+      const extraCharge = Math.max(0, durationMin - CREDIT_RESERVED);
+
+      await prisma.organization.update({
+        where: { id: callLog.campaign.organizationId },
+        data: {
+          creditBalance: { increment: refund - extraCharge },
+          creditUsed: { increment: extraCharge - refund },
+        },
+      });
+
+      // ── Upload recording to Supabase Storage ──────────────────────────────
+      const bolnaRecUrl = data.recording_url as string | undefined;
+      if (bolnaRecUrl && callLog.bolnaCallId) {
+        const stored = await uploadRecordingFromUrl(
+          bolnaRecUrl,
+          callLog.campaign.organizationId,
+          callLog.bolnaCallId
+        );
+        if (stored) {
+          updateData.recordingUrl = stored.publicUrl;
+          console.log(`[Webhook/Bolna] Recording uploaded to Supabase: ${stored.path}`);
+        }
+      }
+    }
+
+    // ── Persist CallLog update ─────────────────────────────────────────────
     await prisma.callLog.update({
       where: { id: callLog.id },
-      data: updateData,
+      data: updateData as any,
     });
 
-    // If call ended, update campaign counters
-    if (event === 'call.ended' || event === 'call.failed') {
-      const isSuccess = event === 'call.ended';
+    // ── Update Campaign counters ───────────────────────────────────────────
+    if (isTerminal && callLog.campaign) {
+      const isSuccess = event === 'call.completed';
+
       await prisma.campaign.update({
-        where: { id: callLog.campaignId },
+        where: { id: callLog.campaign.id },
         data: isSuccess
           ? { processedCount: { increment: 1 } }
           : { failedCount: { increment: 1 } },
       });
 
-      // Check if all calls are done and update campaign status
-      const campaign = await prisma.campaign.findUnique({
-        where: { id: callLog.campaignId },
-        select: { totalContacts: true, processedCount: true, failedCount: true },
+      // Mark campaign COMPLETED when all contacts are resolved
+      const updated = await prisma.campaign.findUnique({
+        where: { id: callLog.campaign.id },
+        select: { totalContacts: true, processedCount: true, failedCount: true, name: true },
       });
 
-      if (campaign) {
-        const done = (campaign.processedCount ?? 0) + (campaign.failedCount ?? 0);
-        if (done >= campaign.totalContacts) {
+      if (updated) {
+        const done = updated.processedCount + updated.failedCount;
+        if (updated.totalContacts > 0 && done >= updated.totalContacts) {
           await prisma.campaign.update({
-            where: { id: callLog.campaignId },
+            where: { id: callLog.campaign.id },
             data: { status: 'COMPLETED' },
           });
+          console.log(`[Webhook/Bolna] Campaign "${updated.name}" marked COMPLETED`);
         }
       }
     }
 
-    res.status(200).json({ received: true });
-  })
-);
+    // Mark webhook as processed
+    await prisma.webhookEvent.update({
+      where: { id: webhookId },
+      data: { processed: true },
+    });
+
+    console.log(`[Webhook/Bolna] Processed event="${event}" call_id="${bolnaCallId}"`);
+  } catch (err) {
+    console.error('[Webhook/Bolna] Processing error:', err);
+    await prisma.webhookEvent.update({
+      where: { id: webhookId },
+      data: { error: String(err) },
+    }).catch(() => {}); // don't throw — this is fire-and-forget
+  }
+}
 
 export default router;

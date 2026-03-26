@@ -5,9 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import Header from './Header';
+import { Header } from './Header';
 
-// Pages that don't require auth and don't show the app shell
 const PUBLIC_PATHS = ['/login'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -18,43 +17,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
-    if (!isLoading && !user && !isPublic) {
-      router.push('/login');
-    }
-    if (!isLoading && user && isPublic) {
-      router.push('/campaigns');
-    }
+    if (!isLoading && !user && !isPublic) router.push('/login');
+    if (!isLoading && user && isPublic) router.push('/analytics');
   }, [user, isLoading, isPublic, router]);
 
-  // Show full-screen spinner while checking auth
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <Loader2 size={28} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
       </div>
     );
   }
 
-  // Public pages (login) — render without shell
-  if (isPublic) {
-    return <>{children}</>;
-  }
+  if (isPublic) return <>{children}</>;
+  if (!user) return null;
 
-  // Unauthenticated, redirect is happening
-  if (!user) {
-    return null;
-  }
-
-  // Authenticated — render full app shell
   return (
-    <div className="flex h-screen">
+    <div className="app-shell">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="main-content">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-gray-50 focus:outline-none">
-          <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-            {children}
-          </div>
+        <main className="page-body">
+          {children}
         </main>
       </div>
     </div>

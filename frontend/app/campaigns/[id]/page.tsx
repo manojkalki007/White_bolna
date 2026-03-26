@@ -1,195 +1,248 @@
 'use client';
 
-import { use } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Phone, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { useCampaign } from '@/lib/hooks/useCampaigns';
-import { useCallLogs } from '@/lib/hooks/useCallLogs';
-import { StatusBadge, Spinner } from '@/components/ui';
-import { ScheduleToggle } from '@/components/campaigns/ScheduleToggle';
-import { AudioPlayer } from '@/components/call-logs/AudioPlayer';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+import { useRouter, useParams } from 'next/navigation';
+import { useToast } from '@/providers/ToastProvider';
+import {
+  Megaphone, Loader2, ChevronLeft, Phone, Clock, CheckCircle2,
+  XCircle, Pause, Play, Users, TrendingUp, AlertCircle, Headphones,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-interface PageProps {
-  params: Promise<{ id: string }>;
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  totalContacts: number;
+  processedCount: number;
+  failedCount: number;
+  activeHoursFrom?: string;
+  activeHoursTo?: string;
+  createdAt: string;
+  agent?: { name: string; llmModel: string; voiceId: string };
 }
 
-export default function CampaignDetailPage({ params }: PageProps) {
-  const { id } = use(params);
-  const { data: campaign, isLoading: loadingCampaign } = useCampaign(id);
-  const { data: logsData, isLoading: loadingLogs } = useCallLogs({ campaignId: id });
+interface CallLog {
+  id: string;
+  status: string;
+  duration?: number;
+  avgLatencyMs?: number;
+  creditCost?: number;
+  createdAt: string;
+  contact?: { name?: string; phoneNumber: string };
+}
 
-  if (loadingCampaign) {
+const STATUS_BADGE: Record<string, string> = {
+  PENDING:     'badge badge-gray',
+  IN_PROGRESS: 'badge badge-blue',
+  COMPLETED:   'badge badge-green',
+  PAUSED:      'badge badge-yellow',
+  FAILED:      'badge badge-red',
+};
+
+const CALL_STATUS_BADGE: Record<string, string> = {
+  COMPLETED: 'badge badge-green',
+  FAILED:    'badge badge-red',
+  NO_ANSWER: 'badge badge-yellow',
+  BUSY:      'badge badge-yellow',
+  IN_CALL:   'badge badge-blue',
+  RINGING:   'badge badge-blue',
+  INITIATED: 'badge badge-gray',
+  PENDING:   'badge badge-gray',
+};
+
+export default function CampaignDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const campaignId = params.id as string;
+  const queryClient = useQueryClient();
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  const { data: campaign, isLoading } = useQuery<Campaign>({
+    queryKey: ['campaign', campaignId],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: Campaign }>(`/campaigns/${campaignId}`);
+      return data.data;
+    },
+  });
+
+  const { data: calls = [], isLoading: callsLoading } = useQuery<CallLog[]>({
+    queryKey: ['campaign-calls', campaignId],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: CallLog[] }>(`/call-logs?campaignId=${campaignId}&limit=50`);
+      return Array.isArray(data.data) ? data.data : [];
+    },
+    refetchInterval: campaign?.status === 'IN_PROGRESS' ? 5000 : false,
+  });
+
+  const pause = useMutation({
+    mutationFn: () => api.post(`/campaigns/${campaignId}/pause`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
+      toastSuccess('Campaign paused');
+    },
+    onError: () => toastError('Pause failed'),
+  });
+
+  const resume = useMutation({
+    mutationFn: () => api.post(`/campaigns/${campaignId}/resume`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
+      toastSuccess('Campaign resumed');
+    },
+    onError: () => toastError('Resume failed'),
+  });
+
+  if (isLoading) {
     return (
-      <div className="flex justify-center pt-24">
-        <Spinner className="h-8 w-8" />
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+        <Loader2 size={28} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
       </div>
     );
   }
 
   if (!campaign) {
     return (
-      <div className="text-center py-24 text-gray-500">Campaign not found.</div>
+      <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+        <AlertCircle size={32} color="#f87171" style={{ margin: '0 auto 12px' }} />
+        <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Campaign not found</p>
+      </div>
     );
   }
 
-  const pct = Math.min(
-    100,
-    Math.round(
-      ((campaign.processedCount + campaign.failedCount) /
-        Math.max(1, campaign.totalContacts)) *
-        100
-    )
-  );
+  const progress = campaign.totalContacts > 0
+    ? Math.round(((campaign.processedCount + campaign.failedCount) / campaign.totalContacts) * 100)
+    : 0;
+
+  const successRate = (campaign.processedCount + campaign.failedCount) > 0
+    ? Math.round((campaign.processedCount / (campaign.processedCount + campaign.failedCount)) * 100)
+    : 0;
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div>
-        <Link
-          href="/campaigns"
-          className="text-teal-600 hover:text-teal-700 flex items-center text-sm font-medium mb-3"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Campaigns
-        </Link>
-        <div className="flex items-start justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => router.back()} className="btn btn-secondary btn-sm">
+            <ChevronLeft size={13} /> Back
+          </button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              {campaign.name}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1 font-mono">
-              Agent: {campaign.smallestAgentId}
+            <h1 className="page-title">{campaign.name}</h1>
+            <p className="page-subtitle">
+              Created {formatDistanceToNow(new Date(campaign.createdAt), { addSuffix: true })}
+              {campaign.agent && ` · Agent: ${campaign.agent.name}`}
             </p>
           </div>
-          <StatusBadge status={campaign.status} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className={STATUS_BADGE[campaign.status] ?? 'badge badge-gray'}>{campaign.status}</span>
+          {campaign.status === 'IN_PROGRESS' && (
+            <button onClick={() => pause.mutate()} disabled={pause.isPending} className="btn btn-secondary btn-sm">
+              <Pause size={13} /> Pause
+            </button>
+          )}
+          {campaign.status === 'PAUSED' && (
+            <button onClick={() => resume.mutate()} disabled={resume.isPending} className="btn btn-primary btn-sm">
+              <Play size={13} /> Resume
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         {[
-          {
-            label: 'Total Contacts',
-            value: campaign.totalContacts,
-            icon: Phone,
-            color: 'text-blue-600 bg-blue-50',
-          },
-          {
-            label: 'Processed',
-            value: campaign.processedCount,
-            icon: CheckCircle2,
-            color: 'text-teal-600 bg-teal-50',
-          },
-          {
-            label: 'Failed',
-            value: campaign.failedCount,
-            icon: XCircle,
-            color: 'text-red-600 bg-red-50',
-          },
-          {
-            label: 'Completion',
-            value: `${pct}%`,
-            icon: Loader2,
-            color: 'text-purple-600 bg-purple-50',
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-white rounded-lg shadow ring-1 ring-gray-200 p-5"
-          >
-            <div
-              className={`inline-flex rounded-lg p-2 mb-3 ${s.color}`}
-            >
-              <s.icon className="h-5 w-5" />
+          { icon: <Users size={16} color="#6366f1" />, label: 'Total Contacts', value: campaign.totalContacts.toLocaleString(), bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.2)' },
+          { icon: <CheckCircle2 size={16} color="#22c55e" />, label: 'Completed', value: campaign.processedCount.toLocaleString(), bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)' },
+          { icon: <XCircle size={16} color="#f87171" />, label: 'Failed', value: campaign.failedCount.toLocaleString(), bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
+          { icon: <TrendingUp size={16} color="#f59e0b" />, label: 'Success Rate', value: `${successRate}%`, bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+        ].map(s => (
+          <div key={s.label} className="card" style={{ padding: 16 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: s.bg, border: `1px solid ${s.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+              {s.icon}
             </div>
-            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{s.label}</p>
+            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{s.value}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Progress bar */}
-      <div className="bg-white rounded-lg shadow ring-1 ring-gray-200 p-5">
-        <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
-          <span>Overall Progress</span>
-          <span>{pct}%</span>
+      {/* Progress Bar */}
+      <div className="card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Overall Progress</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace' }}>{progress}%</span>
         </div>
-        <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-3 bg-teal-600 rounded-full transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
+        <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 4, transition: 'width 0.4s ease' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {campaign.activeHoursFrom && campaign.activeHoursTo
+              ? `Active hours: ${campaign.activeHoursFrom} – ${campaign.activeHoursTo}`
+              : 'No active hour restriction'}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {campaign.processedCount + campaign.failedCount} / {campaign.totalContacts} processed
+          </span>
         </div>
       </div>
 
-      {/* Schedule Toggle */}
-      <ScheduleToggle campaign={campaign} />
-
-      {/* Call Logs */}
-      <div className="bg-white shadow ring-1 ring-gray-200 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">Call Logs</h2>
+      {/* Call Logs Table */}
+      <div className="card">
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Headphones size={14} color="var(--accent)" />
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Call Records</p>
+            <span className="badge badge-accent">{calls.length}</span>
+          </div>
         </div>
-
-        {loadingLogs ? (
-          <div className="flex justify-center p-10">
-            <Spinner className="h-6 w-6" />
+        {callsLoading ? (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <Loader2 size={20} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : calls.length === 0 ? (
+          <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+              No calls yet.{campaign.status === 'IN_PROGRESS' ? ' Calls will appear here as they happen.' : ''}
+            </p>
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="data-table">
+            <thead>
               <tr>
-                {['Contact', 'Phone', 'Status', 'Duration', 'Recording', 'Time'].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
+                {['Contact', 'Phone', 'Status', 'Duration', 'Latency', 'Credit', 'Time'].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {logsData?.data.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                    {log.contact?.name ?? '—'}
+            <tbody>
+              {calls.map(call => (
+                <tr key={call.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>
+                    {call.contact?.name ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap font-mono">
-                    {log.contact?.phoneNumber}
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{call.contact?.phoneNumber ?? '—'}</td>
+                  <td>
+                    <span className={CALL_STATUS_BADGE[call.status] ?? 'badge badge-gray'}>{call.status}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm whitespace-nowrap">
-                    <StatusBadge status={log.status} />
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {call.duration ? `${call.duration}s` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                    {log.duration != null ? `${log.duration}s` : '—'}
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {call.avgLatencyMs ? (
+                      <span style={{ color: call.avgLatencyMs < 500 ? '#22c55e' : call.avgLatencyMs < 1000 ? '#f59e0b' : '#f87171' }}>
+                        {call.avgLatencyMs}ms
+                      </span>
+                    ) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm min-w-[240px]">
-                    {log.recordingUrl ? (
-                      <AudioPlayer url={log.recordingUrl} />
-                    ) : (
-                      <span className="text-gray-400 text-xs">No recording</span>
-                    )}
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    {call.creditCost ? `${call.creditCost.toFixed(2)} min` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                    {formatDistanceToNow(new Date(log.createdAt), {
-                      addSuffix: true,
-                    })}
+                  <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {formatDistanceToNow(new Date(call.createdAt), { addSuffix: true })}
                   </td>
                 </tr>
               ))}
-              {logsData?.data.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="py-8 text-center text-sm text-gray-500"
-                  >
-                    No calls initiated yet.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         )}

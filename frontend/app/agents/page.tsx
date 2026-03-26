@@ -2,111 +2,197 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Spinner } from '@/components/ui';
-import { Bot, Mic, Globe } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import {
+  Bot, Mic, Globe, Zap, Plus, Settings2, Loader2,
+  CheckCircle2, XCircle, AlertCircle, Cpu,
+} from 'lucide-react';
+import Link from 'next/link';
 
 interface Agent {
-  _id: string;
+  id: string;
+  bolnaAgentId: string;
   name: string;
-  workflowType?: string;
-  language?: { default?: string } | string;
-  synthesizer?: { voiceConfig?: { voiceId?: string } };
-  status?: string;
+  status: string;
+  llmModel?: string;
+  llmProvider?: string;
+  voiceId?: string;
+  voiceProvider?: string;
+  language?: string;
+  welcomeMessage?: string;
+  systemPrompt?: string;
+  createdAt: string;
 }
 
-function useAgents() {
-  return useQuery({
-    queryKey: ['agents'],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: Agent[] | { agents: Agent[] } }>('/agents');
-      // Handle both array and wrapped response shapes
-      const raw = data.data;
-      return Array.isArray(raw) ? raw : (raw as any).agents ?? [];
-    },
-  });
-}
+const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; color: string; badge: string }> = {
+  ACTIVE:    { icon: CheckCircle2,  color: '#22c55e', badge: 'badge badge-green'  },
+  INACTIVE:  { icon: XCircle,       color: '#ef4444', badge: 'badge badge-red'    },
+  DRAFT:     { icon: AlertCircle,   color: '#eab308', badge: 'badge badge-yellow' },
+};
+
+const LLM_COLORS: Record<string, string> = {
+  'gpt-4o':      '#10a37f',
+  'gpt-4o-mini': '#10a37f',
+  'claude-3-haiku': '#cc785c',
+  'llama-3-70b': '#7c3aed',
+};
 
 export default function AgentsPage() {
-  const { data: agents = [], isLoading, error } = useAgents();
+  const { user } = useAuth();
+
+  const { data: agents = [], isLoading, error } = useQuery<Agent[]>({
+    queryKey: ['agents', user?.organizationId],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: Agent[] }>('/agents');
+      return Array.isArray(data.data) ? data.data : [];
+    },
+    staleTime: 30_000,
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agents</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          AI voice agents configured in your Smallest.ai workspace.
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="page-title">Voice Agents</h1>
+          <p className="page-subtitle">AI voice agents powered by Bolna — configure, deploy, monitor</p>
+        </div>
+        <Link href="/agents/new" className="btn btn-primary">
+          <Plus size={14} />
+          New Agent
+        </Link>
       </div>
 
+      {/* ── Summary ─────────────────────────────────────────────── */}
+      {!isLoading && agents.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+          {[
+            { label: 'Total Agents',  value: agents.length,                                                   color: '#6366f1', icon: Bot          },
+            { label: 'Active',        value: agents.filter(a => a.status === 'ACTIVE').length,                color: '#22c55e', icon: CheckCircle2 },
+            { label: 'Models Used',   value: new Set(agents.map(a => a.llmModel ?? 'unknown')).size,          color: '#f97316', icon: Cpu          },
+          ].map(s => (
+            <div key={s.label} className="stat-card">
+              <div style={{
+                width: 34, height: 34, borderRadius: 8, marginBottom: 10,
+                background: `${s.color}18`, border: `1px solid ${s.color}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <s.icon size={15} color={s.color} />
+              </div>
+              <p className="stat-card-value" style={{ fontSize: 24 }}>{s.value}</p>
+              <p className="stat-card-label" style={{ marginTop: 4 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Content ─────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex justify-center p-12">
-          <Spinner className="h-8 w-8" />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Loader2 size={28} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
         </div>
       ) : error ? (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          Failed to load agents. Make sure the backend is running and the Atoms API key is valid.
+        <div className="card" style={{ padding: 24 }}>
+          <p style={{ color: '#f87171', fontSize: 13, margin: 0 }}>
+            Failed to load agents. Ensure your Bolna API key is configured in <code style={{ fontFamily: 'monospace', background: 'var(--bg-elevated)', padding: '1px 6px', borderRadius: 4 }}>.env</code>.
+          </p>
         </div>
       ) : agents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow ring-1 ring-gray-200 py-24">
-          <Bot className="h-12 w-12 text-gray-300 mb-4" />
-          <p className="text-gray-500 text-sm">No agents found in your Atoms workspace.</p>
-          <a
-            href="https://app.smallest.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 text-teal-600 hover:underline text-sm font-medium"
-          >
-            Create an agent in Atoms →
-          </a>
+        <div className="card" style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Bot size={24} color="var(--accent)" />
+          </div>
+          <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            No agents yet
+          </p>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Create your first Bolna voice agent to start making calls
+          </p>
+          <Link href="/agents/new" className="btn btn-primary">
+            <Plus size={14} /> Create Agent
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((agent: Agent) => {
-            const agentLang = typeof agent.language === 'object' ? agent.language?.default : agent.language;
-            const agentVoice = agent.synthesizer?.voiceConfig?.voiceId ?? 'Lightning';
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          {agents.map((agent) => {
+            const statusMeta = STATUS_ICON[agent.status] ?? STATUS_ICON.INACTIVE;
+            const modelColor = LLM_COLORS[agent.llmModel ?? ''] ?? '#6366f1';
+
             return (
-            <div
-              key={agent._id}
-              className="bg-white rounded-lg shadow ring-1 ring-gray-200 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
-                    <Bot className="h-5 w-5 text-teal-600" />
+              <div key={agent.id} className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Card header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                      background: 'linear-gradient(135deg, var(--accent), #8b5cf6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Bot size={18} color="white" />
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {agent.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 2 }}>
+                        {agent.bolnaAgentId.slice(0, 20)}…
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{agent.name}</p>
-                    <p className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{agent._id}</p>
+                  <span className={statusMeta.badge} style={{ flexShrink: 0 }}>
+                    {agent.status}
+                  </span>
+                </div>
+
+                {/* Welcome message */}
+                {agent.welcomeMessage && (
+                  <div style={{
+                    padding: '8px 12px', borderRadius: 6,
+                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                    fontSize: 12, color: 'var(--text-secondary)',
+                    fontStyle: 'italic', lineHeight: 1.5,
+                    maxHeight: 48, overflow: 'hidden',
+                  }}>
+                    "{agent.welcomeMessage}"
                   </div>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    agent.status === 'active'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {agent.status ?? 'active'}
-                </span>
-              </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Globe className="h-3.5 w-3.5" />
-                  {agentLang ?? 'English'}
+                {/* Metadata grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { icon: Cpu,   label: agent.llmModel ?? 'Unknown',   color: modelColor   },
+                    { icon: Mic,   label: agent.voiceId ?? 'Default',    color: '#a855f7'    },
+                    { icon: Globe, label: agent.language ?? 'en',        color: '#14b8a6'    },
+                    { icon: Zap,   label: agent.voiceProvider ?? 'bolna', color: '#f97316'  },
+                  ].map(m => (
+                    <div key={m.label} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 8px', borderRadius: 6,
+                      background: `${m.color}10`, border: `1px solid ${m.color}20`,
+                    }}>
+                      <m.icon size={11} color={m.color} />
+                      <span style={{ fontSize: 11, color: m.color, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Mic className="h-3.5 w-3.5" />
-                  {agentVoice}
-                </div>
-              </div>
 
-              <div className="border-t pt-3">
-                <p className="text-xs text-gray-400">
-                  Type: <span className="font-medium text-gray-600">{agent.workflowType ?? 'Single Prompt'}</span>
-                </p>
+                {/* Footer */}
+                <div style={{ display: 'flex', gap: 8, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                  <Link href={`/agents/${agent.id}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                    <Settings2 size={12} /> Configure
+                  </Link>
+                  <Link href={`/campaigns/launch?agentId=${agent.id}`} className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                    <Zap size={12} /> Launch
+                  </Link>
+                </div>
               </div>
-            </div>
             );
           })}
         </div>

@@ -1,75 +1,27 @@
-// Prisma Schema — AI Telephony SaaS
+// ─────────────────────────────────────────────────────────────────────────────
+// Prisma Schema — Bolna Voice AI SaaS (White-Label / Multi-Tenant)
 // Database: PostgreSQL
+// ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Use SUPABASE_DB_URL (pooler) for queries, SUPABASE_DIRECT_URL for migrations
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────
-// User / Auth
+// Enums
 // ─────────────────────────────────────────────
-model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  name           String
-  passwordHash   String
-  role           Role     @default(ADMIN)
-  organizationId String
-
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  campaigns      Campaign[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([organizationId])
-}
 
 enum Role {
   SUPER_ADMIN
   ADMIN
   VIEWER
-}
-
-// ─────────────────────────────────────────────
-// Organization (white-label tenant)
-// ─────────────────────────────────────────────
-model Organization {
-  id       String @id @default(cuid())
-  name     String
-  slug     String @unique
-
-  // ── Per-org Smallest.ai credentials ───────────────────────
-  // If set, overrides the global .env key for this org's API calls
-  smallestAiApiKey  String?   // encrypted in prod
-  smallestAiBaseUrl String?   // optional override
-
-  // ── Plan / billing tier ────────────────────────────────────
-  plan     OrgPlan  @default(STARTER)
-  isActive Boolean  @default(true)
-
-  // ── CRM integration ────────────────────────────────────────
-  crmType          CrmType? // hubspot | salesforce | none
-  crmAccessToken   String?  // OAuth token, encrypted in prod
-  crmRefreshToken  String?
-  crmInstanceUrl   String?  // for Salesforce
-
-  // ── Branding (white-label) ─────────────────────────────────
-  logoUrl       String?
-  primaryColor  String?  @default("#0d9488") // teal-600
-  brandName     String?  // override "Cogniflow" per client
-
-  users      User[]
-  campaigns  Campaign[]
-  contacts   Contact[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 enum OrgPlan {
@@ -84,95 +36,12 @@ enum CrmType {
   NONE
 }
 
-// ─────────────────────────────────────────────
-// Contact
-// ─────────────────────────────────────────────
-model Contact {
-  id             String  @id @default(cuid())
-  organizationId String
-  phoneNumber    String
-  name           String?
-  email          String?
-  metadata       Json?   // arbitrary CSV columns stored as JSON
-
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  callLogs       CallLog[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([organizationId])
-  @@index([phoneNumber])
-}
-
-// ─────────────────────────────────────────────
-// Campaign
-// ─────────────────────────────────────────────
-model Campaign {
-  id              String         @id @default(cuid())
-  organizationId  String
-  createdById     String
-  name            String
-  smallestAgentId String         // Smallest.ai Agent ID
-  status          CampaignStatus @default(PENDING)
-  scheduledStart  DateTime?
-  scheduledEnd    DateTime?
-  activeHoursFrom String?        // e.g. "09:00"
-  activeHoursTo   String?        // e.g. "18:00"
-  timeZone        String         @default("UTC")
-
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  createdBy       User         @relation(fields: [createdById], references: [id])
-  callLogs        CallLog[]
-
-  totalContacts   Int @default(0)
-  processedCount  Int @default(0)
-  failedCount     Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([organizationId])
-  @@index([status])
-}
-
 enum CampaignStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
   PAUSED
   FAILED
-}
-
-// ─────────────────────────────────────────────
-// CallLog
-// ─────────────────────────────────────────────
-model CallLog {
-  id                  String     @id @default(cuid())
-  campaignId          String
-  contactId           String
-  smallestAiCallId    String?    @unique   // returned by Smallest.ai /v1/calls
-  status              CallStatus @default(PENDING)
-  direction           String     @default("outbound")
-  duration            Int?       // seconds
-  transcript          String?    @db.Text
-  recordingUrl        String?
-  disconnectReason    String?
-  postCallMetrics     Json?      // structured metrics from webhook
-  rawWebhookPayload   Json?      // full webhook body stored for debugging
-
-  campaign  Campaign @relation(fields: [campaignId], references: [id])
-  contact   Contact  @relation(fields: [contactId], references: [id])
-
-  startedAt   DateTime?
-  endedAt     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([campaignId])
-  @@index([contactId])
-  @@index([smallestAiCallId])
-  @@index([status])
 }
 
 enum CallStatus {
@@ -184,4 +53,284 @@ enum CallStatus {
   FAILED
   NO_ANSWER
   BUSY
+}
+
+enum AgentStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+// ─────────────────────────────────────────────
+// Organization  (white-label tenant)
+// ─────────────────────────────────────────────
+model Organization {
+  id       String  @id @default(cuid())
+  name     String
+  slug     String  @unique
+
+  // ── Per-org Bolna credentials ──────────────────────────────────────────────
+  // If set, overrides the global BOLNA_API_KEY for this org's API calls.
+  // Encrypted at rest in production (use Vault / AWS KMS).
+  bolnaApiKey   String?   // per-tenant Bolna API key
+  bolnaBaseUrl  String?   // optional override (default: https://api.bolna.dev)
+
+  // ── Credits & Billing ──────────────────────────────────────────────────────
+  // creditBalance: minutes (or units) remaining for the current billing cycle.
+  // creditUsed:    running total consumed since last reset.
+  creditBalance  Float    @default(0)
+  creditUsed     Float    @default(0)
+  creditLimit    Float    @default(500)   // hard cap; calls blocked above this
+
+  // ── Stripe ─────────────────────────────────────────────────────────────────
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?
+
+  // ── Plan / billing tier ────────────────────────────────────────────────────
+  plan     OrgPlan  @default(STARTER)
+  isActive Boolean  @default(true)
+
+  // ── CRM integration ────────────────────────────────────────────────────────
+  crmType          CrmType? // HUBSPOT | SALESFORCE | NONE
+  crmAccessToken   String?  // OAuth token (encrypted in prod)
+  crmRefreshToken  String?
+  crmInstanceUrl   String?  // for Salesforce
+
+  // ── White-label branding ───────────────────────────────────────────────────
+  logoUrl      String?
+  primaryColor String?  @default("#6366f1")
+  brandName    String?  // e.g. "AcmeCalls" instead of "VoiceAI"
+  customDomain String?  @unique // CNAME e.g. calls.acme.com
+
+  // ── Relations ──────────────────────────────────────────────────────────────
+  users      User[]
+  campaigns  Campaign[]
+  contacts   Contact[]
+  agents     BolnaAgent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// User / Auth
+// ─────────────────────────────────────────────
+model User {
+  id             String  @id @default(cuid())
+  email          String  @unique
+  name           String
+  // passwordHash kept for legacy — auth is now managed by Supabase
+  passwordHash   String  @default("(supabase-managed)")
+  // Supabase Auth UID — links our record to auth.users
+  supabaseUid    String? @unique
+  role           Role    @default(ADMIN)
+  organizationId String
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  campaigns    Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([supabaseUid])
+}
+
+// ─────────────────────────────────────────────
+// Supabase Storage — file metadata tracker
+// Actual files stored in Supabase Storage buckets
+// ─────────────────────────────────────────────
+model StorageFile {
+  id             String   @id @default(cuid())
+  organizationId String
+  bucket         String   // e.g. "recordings" | "kb-documents"
+  path           String   // path within the bucket
+  publicUrl      String?  // Supabase public URL
+  mimeType       String?
+  sizeBytes      Int?
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([bucket])
+}
+
+// ─────────────────────────────────────────────
+// BolnaAgent
+// Stores a local mirror of every Bolna agent
+// created by / for this organization.
+// ─────────────────────────────────────────────
+model BolnaAgent {
+  id             String      @id @default(cuid())
+  organizationId String
+  bolnaAgentId   String      @unique  // ID returned by Bolna API on creation
+  name           String
+  status         AgentStatus @default(ACTIVE)
+
+  // ── Agent configuration (mirrors Bolna JSON) ───────────────────────────────
+  // LLM config
+  llmModel       String   @default("gpt-4o-mini") // gpt-4o, claude-3-haiku, etc.
+  llmProvider    String   @default("openai")       // openai | anthropic | groq
+  systemPrompt   String   @db.Text                 // full system / persona prompt
+  temperature    Float    @default(0.7)
+
+  // Voice (TTS) config
+  voiceId        String   @default("ritu")         // Bolna voice ID
+  voiceProvider  String   @default("bolna")         // bolna | eleven_labs | azure
+  language       String   @default("en")
+
+  // Telephony config
+  fromNumber     String?                           // Twilio / Plivo DID
+
+  // Latency optimization
+  ambientNoiseDetection Boolean @default(true)
+  interruptionThreshold Float   @default(0.5)  // 0–1 (lower = more interruptible)
+  bufferingDelay        Int     @default(100)  // ms; tune for <500ms e2e latency
+
+  // Welcome message spoken when call connects
+  welcomeMessage String?  @db.Text
+
+  // Raw Bolna config stored for debugging / re-sync
+  rawConfig      Json?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  campaigns    Campaign[]
+  callLogs     CallLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// Contact
+// ─────────────────────────────────────────────
+model Contact {
+  id             String  @id @default(cuid())
+  organizationId String
+  phoneNumber    String
+  name           String?
+  email          String?
+  metadata       Json?   // arbitrary CSV columns stored as JSON
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  callLogs     CallLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([phoneNumber])
+  @@unique([organizationId, phoneNumber]) // one record per phone per org
+}
+
+// ─────────────────────────────────────────────
+// Campaign
+// ─────────────────────────────────────────────
+model Campaign {
+  id             String         @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  bolnaAgentId   String         // FK → BolnaAgent.id (local)
+  status         CampaignStatus @default(PENDING)
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  activeHoursFrom String?       // "09:00"
+  activeHoursTo   String?       // "18:00"
+  timeZone        String        @default("UTC")
+
+  // ── Credit snapshot (deducted at campaign completion) ──────────────────────
+  creditDeducted Float          @default(0) // minutes consumed by this campaign
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+  agent        BolnaAgent   @relation(fields: [bolnaAgentId], references: [id])
+  callLogs     CallLog[]
+
+  totalContacts  Int @default(0)
+  processedCount Int @default(0)
+  failedCount    Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([bolnaAgentId])
+}
+
+// ─────────────────────────────────────────────
+// CallLog
+// ─────────────────────────────────────────────
+model CallLog {
+  id             String     @id @default(cuid())
+  campaignId     String
+  contactId      String
+  agentId        String?    // FK → BolnaAgent.id (local)
+
+  // Bolna call tracking
+  bolnaCallId    String?    @unique  // call_id returned by Bolna
+
+  status         CallStatus @default(PENDING)
+  direction      String     @default("outbound") // outbound | inbound
+
+  // ── Post-call data (populated via webhook) ─────────────────────────────────
+  duration           Int?      // seconds
+  transcript         String?   @db.Text
+  recordingUrl       String?   // Supabase Storage URL (after upload)
+  bolnaRecordingUrl  String?   // raw Bolna recording URL (before our re-upload)
+  storageFileId      String?   // FK → StorageFile.id (optional)
+  disconnectReason   String?
+
+  // Latency metrics from Bolna webhook
+  avgLatencyMs       Int?      // average LLM response latency in ms
+  p95LatencyMs       Int?      // 95th-percentile latency
+
+  // Structured post-call analytics
+  postCallMetrics    Json?     // { sentiment, intent, summary, custom_data }
+  rawWebhookPayload  Json?     // full Bolna webhook body (debugging)
+
+  // ── Credit cost ────────────────────────────────────────────────────────────
+  creditCost         Float?    // minutes billed for this call
+
+  campaign   Campaign    @relation(fields: [campaignId], references: [id])
+  contact    Contact     @relation(fields: [contactId], references: [id])
+  agent      BolnaAgent? @relation(fields: [agentId], references: [id])
+
+  startedAt  DateTime?
+  endedAt    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([bolnaCallId])
+  @@index([agentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// WebhookEvent  (audit log)
+// Stores every inbound webhook for debugging /
+// replay without touching CallLog directly.
+// ─────────────────────────────────────────────
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  source      String   @default("bolna") // bolna | stripe | crm
+  eventType   String   // e.g. "call.completed"
+  bolnaCallId String?
+  payload     Json
+  processed   Boolean  @default(false)
+  error       String?  // error message if processing failed
+
+  createdAt DateTime @default(now())
+
+  @@index([bolnaCallId])
+  @@index([processed])
+  @@index([source, eventType])
 }

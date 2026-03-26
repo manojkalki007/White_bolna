@@ -1,214 +1,221 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UploadCloud, CheckCircle2, ArrowLeft, ChevronDown } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/providers/AuthProvider';
+import { useRouter } from 'next/navigation';
+import {
+  Megaphone, Bot, Upload, Clock, Loader2,
+  CheckCircle2, AlertCircle, ChevronLeft, FileText,
+} from 'lucide-react';
 
-interface Agent {
-  _id: string;
-  name: string;
-}
-
-function useAgentOptions() {
-  return useQuery<Agent[]>({
-    queryKey: ['agents'],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: Agent[] | { agents: Agent[] } }>('/agents');
-      const raw = data.data;
-      return Array.isArray(raw) ? raw : (raw as any).agents ?? [];
-    },
-  });
-}
+interface Agent { id: string; name: string; bolnaAgentId: string; }
 
 export default function LaunchCampaignPage() {
+  const { user } = useAuth();
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
   const [agentId, setAgentId] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [activeHoursFrom, setActiveHoursFrom] = useState('');
-  const [activeHoursTo, setActiveHoursTo] = useState('');
+  const [fromNumber, setFromNumber] = useState('');
+  const [hoursFrom, setHoursFrom] = useState('09:00');
+  const [hoursTo, setHoursTo] = useState('18:00');
+  const [concurrency, setConcurrency] = useState('5');
+  const [success, setSuccess] = useState(false);
 
-  const { data: agents = [], isLoading: agentsLoading } = useAgentOptions();
+  const { data: agents = [] } = useQuery<Agent[]>({
+    queryKey: ['agents-list'],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: Agent[] }>('/agents');
+      return Array.isArray(data.data) ? data.data : [];
+    },
+  });
 
-  const launchMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const { data } = await api.post('/campaigns/launch', formData, {
+  const launch = useMutation({
+    mutationFn: async () => {
+      const form = new FormData();
+      form.append('name', name);
+      form.append('agentId', agentId);
+      form.append('fromNumber', fromNumber);
+      form.append('activeHoursFrom', hoursFrom);
+      form.append('activeHoursTo', hoursTo);
+      form.append('concurrentCalls', concurrency);
+      if (file) form.append('csv', file);
+      const { data } = await api.post('/campaigns/launch', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      router.push('/campaigns');
+      setSuccess(true);
+      setTimeout(() => router.push('/campaigns'), 2000);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file || !name || !agentId) return;
-
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('agentId', agentId);
-    formData.append('contacts', file);
-    formData.append('organizationId', process.env.NEXT_PUBLIC_ORG_ID || 'org_default');
-    formData.append('createdById', process.env.NEXT_PUBLIC_DEFAULT_USER_ID || 'user_default');
-
-    if (activeHoursFrom && activeHoursTo) {
-      formData.append('activeHoursFrom', activeHoursFrom);
-      formData.append('activeHoursTo', activeHoursTo);
-    }
-
-    launchMutation.mutate(formData);
-  };
+  const field = (label: string, node: React.ReactNode) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label className="label">{label}</label>
+      {node}
+    </div>
+  );
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="mb-8">
-        <Link href="/campaigns" className="text-teal-600 hover:text-teal-700 flex items-center text-sm font-medium mb-4">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Campaigns
-        </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Launch New Campaign</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Upload a CSV contact list and assign an agent to start an outbound calling campaign.
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 680 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={() => router.back()} className="btn btn-secondary btn-sm">
+          <ChevronLeft size={13} /> Back
+        </button>
+        <div>
+          <h1 className="page-title">Launch Campaign</h1>
+          <p className="page-subtitle">Configure and start an outbound calling campaign</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 shadow sm:rounded-lg">
-        <div className="space-y-6">
-
-          {/* Campaign Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Campaign Name
-            </label>
-            <div className="mt-2">
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-teal-600 sm:text-sm sm:leading-6"
-                placeholder="e.g. Q4 Reactivation"
-              />
+      {success ? (
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <CheckCircle2 size={40} color="#22c55e" style={{ margin: '0 auto 12px' }} />
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+            Campaign Launched!
+          </p>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+            Redirecting to campaigns...
+          </p>
+        </div>
+      ) : (
+        <div className="card">
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Megaphone size={14} color="var(--accent)" />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Campaign Configuration
+              </p>
             </div>
           </div>
 
-          {/* Agent Dropdown */}
-          <div>
-            <label htmlFor="agentId" className="block text-sm font-medium text-gray-700">
-              Select Agent
-            </label>
-            <div className="mt-2 relative">
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Name */}
+            {field('Campaign Name *',
+              <input
+                className="input"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Q2 Onboarding Outreach"
+              />
+            )}
+
+            {/* Agent */}
+            {field('Voice Agent *',
               <select
-                id="agentId"
+                className="input"
                 value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                required
-                disabled={agentsLoading}
-                className="block w-full appearance-none rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-teal-600 sm:text-sm sm:leading-6 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+                onChange={e => setAgentId(e.target.value)}
               >
-                <option value="" disabled>
-                  {agentsLoading ? 'Loading agents…' : agents.length === 0 ? 'No agents found' : '— Choose an agent —'}
-                </option>
-                {agents.map((agent) => (
-                  <option key={agent._id} value={agent._id}>
-                    {agent.name}
-                  </option>
+                <option value="">Select an agent…</option>
+                {agents.map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </div>
-            {!agentsLoading && agents.length === 0 && (
-              <p className="mt-1.5 text-xs text-red-500">
-                No agents available. Please configure an agent in your Smallest.ai workspace.
-              </p>
             )}
-          </div>
 
-          {/* Active Hours */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Active From (Optional)</label>
+            {/* From Number */}
+            {field('From Phone Number',
               <input
-                type="time"
-                value={activeHoursFrom}
-                onChange={(e) => setActiveHoursFrom(e.target.value)}
-                className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-teal-600 sm:text-sm"
+                className="input"
+                value={fromNumber}
+                onChange={e => setFromNumber(e.target.value)}
+                placeholder="+91XXXXXXXXXX"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Active To</label>
-              <input
-                type="time"
-                value={activeHoursTo}
-                onChange={(e) => setActiveHoursTo(e.target.value)}
-                className="mt-2 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-teal-600 sm:text-sm"
-              />
-            </div>
-          </div>
+            )}
 
-          {/* CSV Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Audience (CSV)</label>
-            <div className="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
-              <div className="text-center">
-                {file ? (
-                  <CheckCircle2 className="mx-auto h-12 w-12 text-teal-600 mb-4" />
-                ) : (
-                  <UploadCloud className="mx-auto h-12 w-12 text-gray-300 mb-4" aria-hidden="true" />
-                )}
-                <div className="mt-4 flex text-sm leading-6 text-gray-600">
-                  <label
-                    htmlFor="file-upload"
-                    className="relative cursor-pointer rounded-md bg-white font-semibold text-teal-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-teal-600 focus-within:ring-offset-2 hover:text-teal-500"
-                  >
-                    <span>{file ? 'Change file' : 'Upload a file'}</span>
-                    <input
-                      id="file-upload"
-                      name="file-upload"
-                      type="file"
-                      accept=".csv"
-                      className="sr-only"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                      required
-                    />
-                  </label>
-                  <p className="pl-1">{file ? '' : 'or drag and drop'}</p>
+            {/* CSV Upload */}
+            {field('Contacts CSV *',
+              <div>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  style={{
+                    border: '1px dashed var(--border-active)',
+                    borderRadius: 8, padding: '20px',
+                    textAlign: 'center', cursor: 'pointer',
+                    background: 'var(--bg-elevated)',
+                    transition: 'border-color 0.2s',
+                  }}
+                >
+                  {file ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <FileText size={18} color="var(--accent)" />
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{file.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload size={22} style={{ color: 'var(--text-muted)', margin: '0 auto 8px' }} />
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+                        Click to upload <span style={{ color: 'var(--accent)', fontWeight: 600 }}>CSV file</span>
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                        Required columns: <code style={{ fontFamily: 'monospace' }}>name, phone_number</code>
+                      </p>
+                    </>
+                  )}
                 </div>
-                <p className="text-xs leading-5 text-gray-600 mt-2">
-                  {file
-                    ? `Selected: ${file.name}`
-                    : 'CSV up to 10MB. Must contain a "phoneNumber" column.'}
-                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv"
+                  style={{ display: 'none' }}
+                  onChange={e => setFile(e.target.files?.[0] ?? null)}
+                />
               </div>
+            )}
+
+            {/* Active Hours */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              {field('Start Time',
+                <input className="input" type="time" value={hoursFrom} onChange={e => setHoursFrom(e.target.value)} />
+              )}
+              {field('End Time',
+                <input className="input" type="time" value={hoursTo} onChange={e => setHoursTo(e.target.value)} />
+              )}
+              {field('Concurrent Calls',
+                <input className="input" type="number" min={1} max={20} value={concurrency} onChange={e => setConcurrency(e.target.value)} />
+              )}
             </div>
+
+            {/* Error */}
+            {launch.isError && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, fontSize: 13,
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                color: '#f87171', display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <AlertCircle size={14} />
+                {(launch.error as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to launch campaign'}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              onClick={() => launch.mutate()}
+              disabled={!name || !agentId || !file || launch.isPending}
+              className="btn btn-primary"
+              style={{
+                width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14,
+                opacity: (!name || !agentId || !file || launch.isPending) ? 0.5 : 1,
+              }}
+            >
+              {launch.isPending ? (
+                <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Launching…</>
+              ) : (
+                <><Megaphone size={14} /> Launch Campaign</>
+              )}
+            </button>
           </div>
         </div>
-
-        <div className="mt-6 flex items-center justify-end gap-x-6">
-          <Link href="/campaigns" className="text-sm font-semibold leading-6 text-gray-900">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={launchMutation.isPending || !file || !agentId}
-            className="rounded-md bg-teal-600 px-8 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:opacity-50 transition-colors"
-          >
-            {launchMutation.isPending ? 'Launching…' : 'Launch Campaign'}
-          </button>
-        </div>
-        {launchMutation.isError && (
-          <p className="text-red-500 text-sm mt-4 text-right">Error launching campaign. Please try again.</p>
-        )}
-      </form>
+      )}
     </div>
   );
 }

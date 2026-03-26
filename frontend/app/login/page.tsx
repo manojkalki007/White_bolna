@@ -3,177 +3,248 @@
 import { useState, FormEvent } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRouter } from 'next/navigation';
-import { Bot, Loader2, Eye, EyeOff } from 'lucide-react';
-
-type Mode = 'login' | 'register';
+import { Loader2, Eye, EyeOff, Zap, Phone, Bot, BarChart2, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const router = useRouter();
 
-  const [mode, setMode] = useState<Mode>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [orgName, setOrgName] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [showPw, setShowPw]       = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
+  const [isPaused, setIsPaused]   = useState(false);
+  const [success, setSuccess]     = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!email || !password) { setError('Please enter your email and password.'); return; }
     setError('');
+    setIsPaused(false);
     setLoading(true);
     try {
-      if (mode === 'login') {
-        await login(email, password);
-      } else {
-        await register(name, email, password, orgName);
-      }
-      router.push('/campaigns');
+      await login(email, password);
+      setSuccess(true);
+      setTimeout(() => router.push('/analytics'), 600);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        'Something went wrong. Please try again.';
-      setError(message);
+      const status = (err as { response?: { status?: number; data?: { error?: string } } })?.response?.status;
+      const msg    = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Invalid email or password.';
+      if (status === 503) {
+        setIsPaused(true);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const features = [
+    { icon: Bot,       label: 'AI Voice Agents',     sub: 'Build & deploy in minutes'    },
+    { icon: Phone,     label: 'Bulk Campaigns',      sub: 'Reach thousands instantly'    },
+    { icon: BarChart2, label: 'Real-Time Analytics', sub: 'Live call metrics & insights' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-teal-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-teal-500 text-white mb-4 shadow-lg shadow-teal-500/30">
-            <Bot className="h-8 w-8" />
+    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-primary)' }}>
+
+      {/* ── Left panel ─────────────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', padding: '60px 80px',
+        background: 'linear-gradient(135deg, #0d0d18 0%, #111128 100%)',
+        borderRight: '1px solid var(--border)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* grid bg */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.03,
+          backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }} />
+        {/* glow */}
+        <div style={{
+          position: 'absolute', top: -200, left: -200,
+          width: 500, height: 500, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ position: 'relative' }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 24px rgba(99,102,241,0.4)',
+            }}>
+              <Zap size={22} color="white" />
+            </div>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+              Cogniflow
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Atoms Platform</h1>
-          <p className="text-gray-400 text-sm mt-1">AI Telephony SaaS Dashboard</p>
+
+          <h1 style={{ margin: '0 0 12px', fontSize: 40, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1, letterSpacing: '-1px' }}>
+            Voice AI<br />
+            <span style={{ background: 'linear-gradient(90deg,#6366f1,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              That Converts
+            </span>
+          </h1>
+          <p style={{ margin: '0 0 52px', fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            White-label AI calling platform.<br />Deploy agents, run campaigns, close more.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {features.map(f => (
+              <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <f.icon size={18} color="#818cf8" />
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{f.label}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{f.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right panel ────────────────────────────────────────────────────── */}
+      <div style={{
+        width: 480, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', padding: '60px 56px',
+        background: 'var(--bg-primary)',
+      }}>
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+            Welcome back
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
+            Sign in to your workspace
+          </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Mode Tabs */}
-          <div className="flex border-b border-gray-100">
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 py-4 text-sm font-semibold transition-colors ${
-                mode === 'login'
-                  ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setMode('register'); setError(''); }}
-              className={`flex-1 py-4 text-sm font-semibold transition-colors ${
-                mode === 'register'
-                  ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Register
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-8 space-y-5">
-            {mode === 'register' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                  <input
-                    id="name"
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Jane Smith"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Organization Name</label>
-                  <input
-                    id="orgName"
-                    type="text"
-                    required
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="Acme Corp"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPw ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'Min. 8 characters' : '••••••••'}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            <button
-              id="submit-auth"
-              type="submit"
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Email */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label className="label">Email address</label>
+            <input
+              id="login-email"
+              className="input"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              autoComplete="email"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-70 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm"
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === 'login' ? 'Sign In' : 'Create Account'}
-            </button>
+              required
+            />
+          </div>
 
-            {mode === 'login' && (
-              <p className="text-center text-xs text-gray-500 pt-1">
-                Demo: Register first to create your workspace.
-              </p>
+          {/* Password */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label className="label">Password</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-password"
+                className="input"
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                disabled={loading}
+                required
+                style={{ paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', padding: 4,
+                }}
+              >
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Paused project warning */}
+          {isPaused && (
+            <div style={{
+              padding: '12px 16px', borderRadius: 8, fontSize: 13,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
+              color: '#f59e0b', lineHeight: 1.5,
+            }}>
+              <strong>⚠️ Supabase project is paused.</strong><br />
+              Free-tier projects pause after inactivity.{' '}
+              <a
+                href="https://supabase.com/dashboard/project/cbpzsvzfoquowbldtsrh"
+                target="_blank" rel="noreferrer"
+                style={{ color: '#fbbf24', fontWeight: 700, textDecoration: 'underline' }}
+              >
+                Click here to restore it →
+              </a>
+              <br />
+              <span style={{ fontSize: 11, opacity: 0.8 }}>After restoring, wait ~30 seconds and try again.</span>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8, fontSize: 13,
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+              color: '#f87171',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            id="login-submit"
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary"
+            style={{ width: '100%', justifyContent: 'center', padding: '13px 0', fontSize: 15, fontWeight: 700, marginTop: 4 }}
+          >
+            {success ? (
+              <><CheckCircle2 size={16} /> Signed in!</>
+            ) : loading ? (
+              <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Signing in…</>
+            ) : (
+              'Sign in'
             )}
-          </form>
-        </div>
+          </button>
+        </form>
 
-        <p className="text-center text-xs text-gray-500 mt-6">
-          Powered by{' '}
-          <a href="https://smallest.ai" target="_blank" rel="noreferrer" className="text-teal-400 hover:underline">
-            Smallest.ai Atoms
-          </a>
-        </p>
+        {/* Demo credentials hint */}
+        <div style={{
+          marginTop: 32, padding: '14px 16px', borderRadius: 10,
+          background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+        }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Super Admin Credentials
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+            manojkalki007@gmail.com
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+            Cogniflowsuper@2026
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -2,107 +2,131 @@
 
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Spinner } from '@/components/ui';
-import { Phone, MapPin, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import { Phone, Plus, CheckCircle2, Loader2, Globe } from 'lucide-react';
 
 interface PhoneNumber {
-  id: string;
-  phone_number: string;
-  country: string;
+  id?: string;
+  phoneNumber: string;
+  friendlyName?: string;
+  numberType?: string;
+  country?: string;
+  isActive?: boolean;
   capabilities?: { voice?: boolean; sms?: boolean };
-  status?: string;
-  agent_id?: string | null;
-}
-
-function useNumbers() {
-  return useQuery({
-    queryKey: ['numbers'],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: PhoneNumber[] | any }>('/numbers');
-      const raw = data.data;
-      return Array.isArray(raw) ? raw : (raw as any)?.phone_numbers ?? [];
-    },
-  });
 }
 
 export default function NumbersPage() {
-  const { data: numbers = [], isLoading, error } = useNumbers();
+  const { user } = useAuth();
+
+  const { data: numbers = [], isLoading, error } = useQuery<PhoneNumber[]>({
+    queryKey: ['numbers', user?.organizationId],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: PhoneNumber[] }>('/numbers');
+      return Array.isArray(data.data) ? data.data : [];
+    },
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Phone Numbers</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Phone numbers rented or imported in your Smallest.ai workspace.
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="page-title">Phone Numbers</h1>
+          <p className="page-subtitle">Manage Bolna-registered phone numbers for your campaigns</p>
+        </div>
+        <button className="btn btn-primary">
+          <Plus size={14} /> Buy Number
+        </button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center p-12"><Spinner className="h-8 w-8" /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Loader2 size={24} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+        </div>
       ) : error ? (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          Failed to load phone numbers. Make sure the backend is running.
+        <div className="card" style={{ padding: 24 }}>
+          <p style={{ color: '#f87171', fontSize: 13, margin: 0 }}>
+            Failed to load phone numbers. Configure your Bolna API key in <code>.env</code>.
+          </p>
         </div>
       ) : numbers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow ring-1 ring-gray-200 py-24">
-          <Phone className="h-12 w-12 text-gray-300 mb-4" />
-          <p className="text-gray-500 text-sm">No phone numbers found in your workspace.</p>
-          <a
-            href="https://app.smallest.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 text-teal-600 hover:underline text-sm font-medium"
-          >
-            Rent a number in Atoms →
-          </a>
+        <div className="card" style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Phone size={24} color="var(--accent)" />
+          </div>
+          <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            No phone numbers yet
+          </p>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Purchase or import phone numbers to use in campaigns
+          </p>
+          <button className="btn btn-primary">
+            <Plus size={14} /> Buy Number
+          </button>
         </div>
       ) : (
-        <div className="bg-white shadow ring-1 ring-gray-200 rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="card">
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Phone size={14} color="var(--accent)" />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Phone Numbers
+              </p>
+              <span className="badge badge-accent">{numbers.length}</span>
+            </div>
+          </div>
+          <table className="data-table">
+            <thead>
               <tr>
-                {['Phone Number', 'Country', 'Capabilities', 'Agent Assigned', 'Status'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    {h}
-                  </th>
+                {['Number', 'Friendly Name', 'Type', 'Country', 'Capabilities', 'Status'].map(h => (
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {numbers.map((n: PhoneNumber) => (
-                <tr key={n.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-sm font-semibold text-gray-900">
-                    {n.phone_number}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" /> {n.country ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    <div className="flex gap-2">
-                      {n.capabilities?.voice && (
-                        <span className="rounded-full bg-teal-50 text-teal-700 px-2 py-0.5 text-xs font-medium">Voice</span>
-                      )}
-                      {n.capabilities?.sms && (
-                        <span className="rounded-full bg-blue-50 text-blue-700 px-2 py-0.5 text-xs font-medium">SMS</span>
-                      )}
-                      {!n.capabilities?.voice && !n.capabilities?.sms && <span className="text-gray-400">—</span>}
+            <tbody>
+              {numbers.map((n, i) => (
+                <tr key={n.id ?? i}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                        background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Phone size={14} color="#22c55e" />
+                      </div>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: 13 }}>
+                        {n.phoneNumber}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {n.agent_id ? (
-                      <span className="font-mono text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{n.agent_id}</span>
-                    ) : (
-                      <span className="text-gray-400 italic text-xs">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      n.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {n.status ?? 'active'}
+                  <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{n.friendlyName ?? '—'}</td>
+                  <td>
+                    <span className="badge badge-accent" style={{ fontSize: 10 }}>
+                      {n.numberType ?? 'local'}
                     </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Globe size={12} style={{ color: 'var(--text-muted)' }} />
+                      <span style={{ fontSize: 12 }}>{n.country ?? 'IN'}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {n.capabilities?.voice && <span className="badge badge-green" style={{ fontSize: 10 }}>Voice</span>}
+                      {n.capabilities?.sms && <span className="badge badge-blue" style={{ fontSize: 10 }}>SMS</span>}
+                    </div>
+                  </td>
+                  <td>
+                    {n.isActive !== false ? (
+                      <span className="badge badge-green"><CheckCircle2 size={10} /> Active</span>
+                    ) : (
+                      <span className="badge badge-red">Inactive</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -110,17 +134,6 @@ export default function NumbersPage() {
           </table>
         </div>
       )}
-
-      <div className="rounded-lg bg-teal-50 ring-1 ring-teal-200 p-4 text-sm text-teal-800 flex items-start gap-2">
-        <ArrowRight className="h-4 w-4 mt-0.5 shrink-0" />
-        <span>
-          To rent new numbers or assign them to agents, visit{' '}
-          <a href="https://app.smallest.ai" target="_blank" rel="noopener noreferrer" className="underline font-medium">
-            app.smallest.ai
-          </a>{' '}
-          → Phone Numbers.
-        </span>
-      </div>
     </div>
   );
 }

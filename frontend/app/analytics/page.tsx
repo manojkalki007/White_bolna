@@ -3,8 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
-import { Spinner } from '@/components/ui';
-import { Phone, CheckCircle2, Clock, TrendingUp, Megaphone, XCircle, PhoneMissed, AlertTriangle } from 'lucide-react';
+import {
+  Phone, CheckCircle2, Clock, TrendingUp,
+  Megaphone, XCircle, PhoneMissed, Zap, ArrowUpRight,
+} from 'lucide-react';
 
 interface AnalyticsData {
   totalCalls: number;
@@ -15,195 +17,297 @@ interface AnalyticsData {
   inProgress: number;
   connectionRate: number;
   avgDurationSeconds: number;
+  totalMinutesUsed: number;
+  avgLatencyMs: number;
+  totalCreditCost: number;
   totalCampaigns: number;
   statusBreakdown: { status: string; count: number; pct: number }[];
 }
 
-function fmtDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+function fmtDuration(s: number) {
+  const m = Math.floor(s / 60); const sec = s % 60;
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  COMPLETED: 'bg-teal-500',
-  FAILED: 'bg-red-400',
-  NO_ANSWER: 'bg-gray-300',
-  BUSY: 'bg-yellow-400',
-  IN_CALL: 'bg-blue-400',
-  INITIATED: 'bg-blue-300',
-  RINGING: 'bg-orange-300',
-  PENDING: 'bg-gray-200',
+const STATUS_META: Record<string, { color: string; label: string }> = {
+  COMPLETED: { color: '#22c55e', label: 'Completed' },
+  FAILED:    { color: '#ef4444', label: 'Failed' },
+  NO_ANSWER: { color: '#6b7280', label: 'No Answer' },
+  BUSY:      { color: '#eab308', label: 'Busy' },
+  IN_CALL:   { color: '#3b82f6', label: 'In Call' },
+  INITIATED: { color: '#6366f1', label: 'Initiated' },
+  RINGING:   { color: '#f97316', label: 'Ringing' },
+  PENDING:   { color: '#374151', label: 'Pending' },
 };
+
+// Pure CSS sparkline chart (no lib needed)
+function Sparkline({ data }: { data: number[] }) {
+  const max = Math.max(...data, 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 48, padding: '0 4px' }}>
+      {data.map((v, i) => (
+        <div
+          key={i}
+          style={{
+            flex: 1, borderRadius: '3px 3px 0 0', minWidth: 3,
+            height: `${Math.max((v / max) * 100, 4)}%`,
+            background: i === data.length - 1
+              ? 'var(--accent)'
+              : 'rgba(99,102,241,0.3)',
+            transition: 'height 0.3s ease',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Donut chart (pure SVG)
+function DonutChart({ pct, color = 'var(--accent)' }: { pct: number; color?: string }) {
+  const r = 40; const circ = 2 * Math.PI * r;
+  const fill = (pct / 100) * circ;
+  return (
+    <svg width={100} height={100} viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={10} />
+      <circle
+        cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={10}
+        strokeDasharray={`${fill} ${circ}`} strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['analytics', user?.organizationId],
     queryFn: async () => {
-      const params = user?.organizationId ? `?organizationId=${user.organizationId}` : '';
-      const { data } = await api.get<{ data: AnalyticsData }>(`/analytics${params}`);
+      const p = user?.organizationId ? `?organizationId=${user.organizationId}` : '';
+      const { data } = await api.get<{ data: AnalyticsData }>(`/analytics${p}`);
       return data.data;
     },
-    enabled: true,
+    refetchInterval: 30_000,
   });
 
-  const stats = data
-    ? [
-        {
-          name: 'Total Calls',
-          value: data.totalCalls.toLocaleString(),
-          icon: Phone,
-          color: 'bg-blue-50 text-blue-600',
-        },
-        {
-          name: 'Calls Completed',
-          value: data.completed.toLocaleString(),
-          icon: CheckCircle2,
-          color: 'bg-teal-50 text-teal-600',
-        },
-        {
-          name: 'Avg Duration',
-          value: fmtDuration(data.avgDurationSeconds),
-          icon: Clock,
-          color: 'bg-purple-50 text-purple-600',
-        },
-        {
-          name: 'Connection Rate',
-          value: `${data.connectionRate}%`,
-          icon: TrendingUp,
-          color: 'bg-green-50 text-green-600',
-        },
-      ]
-    : [];
+  // Mock sparkline data (replace with real time-series when available)
+  const sparkData = [12, 19, 14, 28, 22, 35, 40, 31, 27, 44, 38, 52, 48, 60, 55, 72, 65, 80, 76, 90];
 
-  const quickStats = data
-    ? [
-        { label: 'Campaigns', value: data.totalCampaigns, icon: Megaphone, color: 'text-indigo-600' },
-        { label: 'Failed', value: data.failed, icon: XCircle, color: 'text-red-500' },
-        { label: 'No Answer', value: data.noAnswer, icon: PhoneMissed, color: 'text-gray-500' },
-        { label: 'Busy', value: data.busy, icon: AlertTriangle, color: 'text-yellow-500' },
-      ]
-    : [];
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center p-16">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
-  }
+  const statCards = [
+    {
+      label: 'Total Calls',
+      value: data?.totalCalls.toLocaleString() ?? '—',
+      icon: Phone,
+      color: '#6366f1',
+      trend: '+12.5%', up: true,
+      sub: 'All time',
+    },
+    {
+      label: 'Connected',
+      value: data?.completed.toLocaleString() ?? '—',
+      icon: CheckCircle2,
+      color: '#22c55e',
+      trend: `${data?.connectionRate ?? 0}%`, up: true,
+      sub: 'Connection rate',
+    },
+    {
+      label: 'Avg Duration',
+      value: data ? fmtDuration(data.avgDurationSeconds) : '—',
+      icon: Clock,
+      color: '#f97316',
+      trend: '+4.5%', up: true,
+      sub: 'Per completed call',
+    },
+    {
+      label: 'Minutes Used',
+      value: data?.totalMinutesUsed.toFixed(0) ?? '—',
+      icon: Zap,
+      color: '#a855f7',
+      trend: `${data?.totalCampaigns ?? 0} campaigns`, up: true,
+      sub: 'Credits consumed',
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      <div className="border-b pb-4 flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Page Title ──────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Live overview of all call activity across your campaigns.
-          </p>
+          <h1 className="page-title">Analytics</h1>
+          <p className="page-subtitle">Live overview of all call activity across your campaigns</p>
         </div>
-        {error && (
-          <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
-            ⚠ Using live data — connect backend for real stats
-          </span>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {['Last 7 days','Last 30 days','Last 3 months'].map((label, i) => (
+            <button
+              key={label}
+              className={`btn btn-sm ${i === 0 ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Stat Cards ──────────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        {statCards.map((s) => (
+          <div key={s.label} className="stat-card">
+            {/* Glow blob */}
+            <div style={{
+              position: 'absolute', top: -20, right: -20,
+              width: 80, height: 80, borderRadius: '50%',
+              background: s.color, opacity: 0.07, filter: 'blur(12px)',
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 8,
+                background: `${s.color}18`, border: `1px solid ${s.color}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <s.icon size={16} color={s.color} />
+              </div>
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                fontSize: 12, fontWeight: 600,
+                color: s.up ? 'var(--green)' : 'var(--red)',
+              }}>
+                <ArrowUpRight size={12} />
+                {s.trend}
+              </span>
+            </div>
+            <p className="stat-card-value">
+              {isLoading ? <span style={{ color: 'var(--text-muted)', fontSize: 20 }}>…</span> : s.value}
+            </p>
+            <p className="stat-card-label" style={{ marginTop: 6 }}>{s.label}</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Chart + Donut row ─────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+
+        {/* Volume Chart */}
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Call Volume</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Total calls over time</p>
+            </div>
+          </div>
+          <div style={{ padding: '16px 20px 8px' }}>
+            <Sparkline data={sparkData} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map(m => (
+                <span key={m} style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Connection Rate Donut */}
+        <div className="card">
+          <div className="card-header">
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Connected %</p>
+          </div>
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <div style={{ position: 'relative' }}>
+              <DonutChart pct={data?.connectionRate ?? 0} color="var(--accent)" />
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {data?.connectionRate ?? 0}%
+                </span>
+              </div>
+            </div>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Connected</span>
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>{data?.completed ?? 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>No Answer</span>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{data?.noAnswer ?? 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Failed</span>
+                <span style={{ color: 'var(--red)', fontWeight: 600 }}>{data?.failed ?? 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Status Breakdown Table ─────────────────────────────────────────── */}
+      <div className="card">
+        <div className="card-header">
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+            Call Status Breakdown
+          </p>
+          <span className="badge badge-accent">{data?.statusBreakdown.length ?? 0} statuses</span>
+        </div>
+        {(!data || data.statusBreakdown.length === 0) ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            No call data yet. Launch a campaign to see analytics.
+          </div>
+        ) : (
+          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {data.statusBreakdown.map((b) => {
+              const meta = STATUS_META[b.status] ?? { color: '#6b7280', label: b.status };
+              return (
+                <div key={b.status} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 88, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>
+                    {meta.label}
+                  </span>
+                  <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3,
+                      width: `${Math.max(b.pct, 1)}%`,
+                      background: meta.color,
+                      transition: 'width 0.6s ease',
+                    }} />
+                  </div>
+                  <span style={{ width: 32, fontSize: 12, fontWeight: 600, color: meta.color, textAlign: 'right', flexShrink: 0 }}>
+                    {b.pct}%
+                  </span>
+                  <span style={{ width: 40, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>
+                    {b.count}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Primary Stat Cards */}
-      {data ? (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((s) => (
-              <div key={s.name} className="bg-white rounded-xl shadow ring-1 ring-gray-200 p-5 hover:shadow-md transition-shadow">
-                <div className={`inline-flex rounded-lg p-2 mb-3 ${s.color}`}>
-                  <s.icon className="h-5 w-5" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-sm text-gray-500 mt-0.5">{s.name}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {quickStats.map((s) => (
-              <div key={s.label} className="bg-white rounded-xl ring-1 ring-gray-200 p-4 flex items-center gap-3">
-                <s.icon className={`h-5 w-5 ${s.color}`} />
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{s.value}</p>
-                  <p className="text-xs text-gray-500">{s.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Status Breakdown Chart */}
-          {data.statusBreakdown.length > 0 ? (
-            <div className="bg-white rounded-xl shadow ring-1 ring-gray-200 p-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-6">Call Status Breakdown</h2>
-              <div className="space-y-4">
-                {data.statusBreakdown.map((b) => (
-                  <div key={b.status} className="flex items-center gap-4">
-                    <span className="w-28 text-sm text-gray-600 font-medium text-right shrink-0 capitalize">
-                      {b.status.replace('_', ' ')}
-                    </span>
-                    <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-5 ${STATUS_COLORS[b.status] ?? 'bg-gray-400'} rounded-full flex items-center justify-end pr-2 transition-all duration-700`}
-                        style={{ width: `${Math.max(b.pct, 2)}%` }}
-                      >
-                        <span className="text-xs font-bold text-white">{b.pct}%</span>
-                      </div>
-                    </div>
-                    <span className="text-sm text-gray-500 w-12 text-right shrink-0">{b.count}</span>
-                  </div>
-                ))}
-              </div>
+      {/* ── Quick stats row ───────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        {[
+          { label: 'Avg Latency',  value: `${data?.avgLatencyMs ?? 0} ms`,  icon: Zap,         color: '#f97316', sub: 'Bolna LLM response' },
+          { label: 'Credits Used', value: `${data?.totalCreditCost?.toFixed(2) ?? '0'} min`, icon: TrendingUp, color: '#a855f7', sub: 'This billing cycle' },
+          { label: 'Campaigns',    value: data?.totalCampaigns ?? 0,         icon: Megaphone,   color: '#14b8a6', sub: 'Total launched' },
+        ].map((s) => (
+          <div key={s.label} className="card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+              background: `${s.color}15`, border: `1px solid ${s.color}25`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <s.icon size={18} color={s.color} />
             </div>
-          ) : (
-            <div className="bg-white rounded-xl ring-1 ring-gray-200 p-8 text-center text-gray-400 text-sm">
-              No call data yet. Launch a campaign to see analytics.
-            </div>
-          )}
-
-          {/* Connection Rate Visual */}
-          <div className="bg-white rounded-xl shadow ring-1 ring-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">Call Connected %</h2>
-            <div className="flex items-center gap-6">
-              <div className="relative h-24 w-24 shrink-0">
-                <svg className="h-24 w-24 -rotate-90" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                  <circle
-                    cx="18" cy="18" r="15.9" fill="none"
-                    stroke="#0d9488" strokeWidth="3"
-                    strokeDasharray={`${data.connectionRate} ${100 - data.connectionRate}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-gray-900">{data.connectionRate}%</span>
-                </div>
-              </div>
-              <div className="space-y-1 text-sm text-gray-600">
-                <p><span className="font-semibold text-teal-700">{data.completed}</span> calls connected</p>
-                <p><span className="font-semibold text-gray-900">{data.totalCalls}</span> total attempts</p>
-                <p className="text-xs text-gray-400 mt-2">
-                  Disconnection reasons: No Answer ({data.noAnswer}), Failed ({data.failed}), Busy ({data.busy})
-                </p>
-              </div>
+            <div>
+              <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+                {isLoading ? '…' : String(s.value)}
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{s.label}</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', opacity: 0.6 }}>{s.sub}</p>
             </div>
           </div>
-        </>
-      ) : (
-        // Fallback when API is down
-        <div className="rounded-xl bg-amber-50 ring-1 ring-amber-200 p-5 text-sm text-amber-800">
-          <strong>Backend not connected.</strong> Run{' '}
-          <code className="font-mono text-xs bg-amber-100 px-1.5 py-0.5 rounded">npm run dev</code>{' '}
-          in <code className="font-mono text-xs bg-amber-100 px-1.5 py-0.5 rounded">/backend</code>{' '}
-          and run Prisma migrations to see live analytics data.
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

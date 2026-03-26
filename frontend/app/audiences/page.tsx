@@ -1,186 +1,126 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Spinner } from '@/components/ui';
-import { Users, UploadCloud, Trash2, Search, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import { Users, Plus, Phone, Loader2, MoreVertical } from 'lucide-react';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'org_default';
-
-interface Contact {
+interface Audience {
   id: string;
-  phoneNumber: string;
-  name: string | null;
-  email: string | null;
+  name: string;
+  description?: string;
+  _count?: { contacts: number };
   createdAt: string;
 }
 
-function useContacts(search: string, page: number) {
-  return useQuery({
-    queryKey: ['audiences', { search, page }],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: Contact[]; total: number }>('/audiences', {
-        params: { organizationId: ORG_ID, page, search: search || undefined },
-      });
-      return data;
-    },
-  });
-}
-
 export default function AudiencesPage() {
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadDone, setUploadDone] = useState(false);
+  const { user } = useAuth();
 
-  const { data, isLoading } = useContacts(search, page);
-
-  const importMutation = useMutation({
-    mutationFn: async (f: File) => {
-      const formData = new FormData();
-      formData.append('contacts', f);
-      formData.append('organizationId', ORG_ID);
-      const { data } = await api.post('/audiences/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return data;
+  const { data: audiences = [], isLoading } = useQuery<Audience[]>({
+    queryKey: ['audiences', user?.organizationId],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: Audience[] }>('/audiences');
+      return Array.isArray(data.data) ? data.data : [];
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['audiences'] });
-      setFile(null);
-      setUploadDone(true);
-      setTimeout(() => setUploadDone(false), 3000);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/audiences/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['audiences'] }),
   });
 
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Audiences</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage contact lists for outbound campaigns. Import via CSV.
-        </p>
-      </div>
-
-      {/* Import CSV */}
-      <div className="bg-white rounded-lg shadow ring-1 ring-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <UploadCloud className="h-4 w-4 text-teal-600" />
-          Import Contacts via CSV
-        </h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="cursor-pointer">
-            <span className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              {file ? file.name : 'Choose CSV file'}
-            </span>
-            <input
-              type="file"
-              accept=".csv"
-              className="sr-only"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          <button
-            disabled={!file || importMutation.isPending}
-            onClick={() => file && importMutation.mutate(file)}
-            className="rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
-          >
-            {importMutation.isPending ? 'Importing...' : 'Import'}
-          </button>
-          {uploadDone && (
-            <span className="flex items-center gap-1 text-sm text-teal-700 font-medium">
-              <CheckCircle2 className="h-4 w-4" /> Imported successfully!
-            </span>
-          )}
-          {importMutation.isError && (
-            <span className="text-sm text-red-600">Import failed. Check CSV format.</span>
-          )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="page-title">Audiences</h1>
+          <p className="page-subtitle">Manage contact lists for outbound campaigns</p>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
-          CSV must contain a <code className="bg-gray-100 px-1 rounded">phoneNumber</code> column. Other columns (Name, Email, etc.) are stored as metadata.
-        </p>
+        <Link href="/audiences/new" className="btn btn-primary">
+          <Plus size={14} /> New Audience
+        </Link>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search by name, phone, or email..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full rounded-md border-0 pl-9 pr-4 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-teal-600"
-        />
-      </div>
-
-      {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center p-12"><Spinner className="h-8 w-8" /></div>
-      ) : (
-        <div className="bg-white shadow ring-1 ring-gray-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-              <Users className="h-4 w-4 text-teal-600" />
-              {data?.total ?? 0} Contacts
-            </span>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Loader2 size={24} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : audiences.length === 0 ? (
+        <div className="card" style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Users size={24} color="var(--accent)" />
           </div>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+            No audiences yet
+          </p>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Upload a CSV to create your first contact list
+          </p>
+          <Link href="/audiences/new" className="btn btn-primary">
+            <Plus size={14} /> Create Audience
+          </Link>
+        </div>
+      ) : (
+        <div className="card">
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Users size={14} color="var(--accent)" />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                Contact Lists
+              </p>
+              <span className="badge badge-accent">{audiences.length}</span>
+            </div>
+          </div>
+          <table className="data-table">
+            <thead>
               <tr>
-                {['Name', 'Phone', 'Email', 'Added', ''].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    {h}
-                  </th>
-                ))}
+                {['List Name', 'Contacts', 'Created', 'Actions'].map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {data?.data.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{c.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 font-mono">{c.phoneNumber}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{c.email ?? '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-400">
-                    {new Date(c.createdAt).toLocaleDateString()}
+            <tbody>
+              {audiences.map(a => (
+                <tr key={a.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Users size={14} color="var(--accent)" />
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: 13 }}>{a.name}</p>
+                        {a.description && (
+                          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>{a.description}</p>
+                        )}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => deleteMutation.mutate(c.id)}
-                      className="text-red-400 hover:text-red-600 transition-colors"
-                      title="Delete contact"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Phone size={12} style={{ color: 'var(--text-muted)' }} />
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {(a._count?.contacts ?? 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Link href={`/audiences/${a.id}`} className="btn btn-secondary btn-sm">View</Link>
+                      <Link href={`/campaigns/launch?audienceId=${a.id}`} className="btn btn-primary btn-sm">
+                        Launch
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
-              {data?.data.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-gray-400">
-                    No contacts found. Import a CSV to get started.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
-
-          {/* Pagination */}
-          {data && data.total > 50 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-gray-600">
-              <span>Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data.total)} of {data.total}</span>
-              <div className="flex gap-2">
-                <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="rounded px-3 py-1 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40">Prev</button>
-                <button disabled={page * 50 >= data.total} onClick={() => setPage(p => p + 1)} className="rounded px-3 py-1 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
