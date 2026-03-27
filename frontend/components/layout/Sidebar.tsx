@@ -104,7 +104,7 @@ export function Sidebar() {
         <div>
           <span className="sidebar-logo-text">Cogniflow</span>
           {isSuperAdmin && (
-            <div style={{ fontSize: 9, color: '#818cf8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
+            <div style={{ fontSize: 9, color: 'var(--primary)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
               Super Admin
             </div>
           )}
@@ -116,7 +116,7 @@ export function Sidebar() {
         {/* Super admin nav at top if applicable */}
         {isSuperAdmin && superAdminNav.map((group) => (
           <div key={group.title}>
-            <div className="sidebar-group-label" style={{ color: '#818cf8' }}>{group.title}</div>
+            <div className="sidebar-group-label" style={{ color: 'var(--primary)' }}>{group.title}</div>
             {group.items.map((item) => (
               <NavItem key={item.name} {...item} active={isActive(item.href)} />
             ))}
@@ -140,8 +140,8 @@ export function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)' }}>
           <Avatar style={{ width: 30, height: 30, flexShrink: 0 }}>
             <AvatarFallback style={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              color: 'white', fontSize: 11, fontWeight: 700,
+              background: 'var(--primary)',
+              color: 'var(--primary-foreground)', fontSize: 11, fontWeight: 700,
             }}>
               {initials}
             </AvatarFallback>

@@ -153,7 +153,7 @@ export default function CampaignDetailPage() {
       {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         {[
-          { icon: <Users size={16} color="#6366f1" />, label: 'Total Contacts', value: campaign.totalContacts.toLocaleString(), bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.2)' },
+          { icon: <Users size={16} color="var(--primary)" />, label: 'Total Contacts', value: campaign.totalContacts.toLocaleString(), bg: 'rgba(225,29,72,0.1)', border: 'rgba(225,29,72,0.2)' },
           { icon: <CheckCircle2 size={16} color="#22c55e" />, label: 'Completed', value: campaign.processedCount.toLocaleString(), bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)' },
           { icon: <XCircle size={16} color="#f87171" />, label: 'Failed', value: campaign.failedCount.toLocaleString(), bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
           { icon: <TrendingUp size={16} color="#f59e0b" />, label: 'Success Rate', value: `${successRate}%`, bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
@@ -175,7 +175,7 @@ export default function CampaignDetailPage() {
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace' }}>{progress}%</span>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 4, transition: 'width 0.4s ease' }} />
+          <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, var(--primary), #be123c)', borderRadius: 4, transition: 'width 0.4s ease' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>

@@ -18,17 +18,22 @@ router.get(
       limit = '20',
     } = req.query as Record<string, string>;
 
-    if (!campaignId && !organizationId) {
-      throw createError('campaignId or organizationId is required', 400);
-    }
+    // req.user is guaranteed by requireAuth
+    const user = (req as any).user;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const where: Record<string, unknown> = {};
-    if (campaignId)      where.campaignId = campaignId;
-    if (status)          where.status = status;
-    if (agentId)         where.agentId = agentId;
-    if (organizationId)  where.campaign = { organizationId }; // tenant isolation
+    const where: any = {};
+    if (campaignId) where.campaignId = campaignId;
+    if (status)     where.status = status;
+    if (agentId)    where.agentId = agentId;
+
+    // Tenant Isolation
+    if (user.role === 'SUPER_ADMIN') {
+      if (organizationId) where.campaign = { organizationId };
+    } else {
+      where.campaign = { organizationId: user.organizationId };
+    }
 
     const [logs, total] = await Promise.all([
       prisma.callLog.findMany({
@@ -59,6 +64,7 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
+    const user = (req as any).user;
     const log = await prisma.callLog.findUnique({
       where: { id: req.params.id },
       include: {
@@ -67,7 +73,14 @@ router.get(
         campaign: { select: { name: true, organizationId: true } },
       } as any,
     });
+    
     if (!log) throw createError('Call log not found', 404);
+    
+    // Tenant Authorization validation
+    if (user.role !== 'SUPER_ADMIN' && log.campaign?.organizationId !== user.organizationId) {
+      throw createError('Access denied: Action isolated to owning tenant.', 403);
+    }
+    
     res.json({ success: true, data: log });
   })
 );

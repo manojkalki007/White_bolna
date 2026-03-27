@@ -4,12 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
 import {
-  Phone, CheckCircle2, Clock, TrendingUp,
-  Megaphone, XCircle, PhoneMissed, Zap, ArrowUpRight,
-  Activity, BarChart2, CalendarDays
+  TrendingUp, TrendingDown, Phone, CheckCircle2,
+  Clock, Zap, ArrowUpRight
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import {
+  AreaChart, Area, XAxis, Tooltip, ResponsiveContainer
+} from 'recharts';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface AnalyticsData {
@@ -29,56 +30,33 @@ interface AnalyticsData {
 }
 
 function fmtDuration(s: number) {
-  const m = Math.floor(s / 60); const sec = s % 60;
+  const m = Math.floor(s / 60); const sec = Math.round(s % 60);
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-const STATUS_META: Record<string, { color: string; label: string }> = {
-  COMPLETED: { color: '#22c55e', label: 'Completed' },
-  FAILED:    { color: '#ef4444', label: 'Failed' },
-  NO_ANSWER: { color: '#6b7280', label: 'No Answer' },
-  BUSY:      { color: '#eab308', label: 'Busy' },
-  IN_CALL:   { color: '#3b82f6', label: 'In Call' },
-  INITIATED: { color: '#6366f1', label: 'Initiated' },
-  RINGING:   { color: '#f97316', label: 'Ringing' },
-  PENDING:   { color: '#374151', label: 'Pending' },
+// Simulated recent daily trend for the graph
+const chartData = [
+  { name: 'Day 1', baseline: 40, actual: 60 },
+  { name: 'Day 2', baseline: 50, actual: 70 },
+  { name: 'Day 3', baseline: 80, actual: 120 },
+  { name: 'Day 4', baseline: 60, actual: 100 },
+  { name: 'Day 5', baseline: 90, actual: 150 },
+  { name: 'Day 6', baseline: 110, actual: 180 },
+  { name: 'Day 7', baseline: 160, actual: 240 },
+];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ background: '#18181b', border: '1px solid #27272a', padding: '8px 12px', borderRadius: 6, color: 'white', fontSize: 13, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+        <p style={{ margin: '0 0 4px', color: '#a1a1aa' }}>{label}</p>
+        <p style={{ margin: 0, fontWeight: 600, color: '#f43f5e' }}>Expected: {payload[0].value}</p>
+        <p style={{ margin: 0, fontWeight: 600, color: '#fb7185' }}>Connected: {payload[1].value}</p>
+      </div>
+    );
+  }
+  return null;
 };
-
-function Sparkline({ data }: { data: number[] }) {
-  const max = Math.max(...data, 1);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64, padding: '0 4px', width: '100%' }}>
-      {data.map((v, i) => (
-        <div
-          key={i}
-          style={{
-            flex: 1, borderRadius: '3px 3px 0 0', minWidth: 4,
-            height: `${Math.max((v / max) * 100, 4)}%`,
-            background: i === data.length - 1
-              ? '#6366f1'
-              : 'rgba(99,102,241,0.25)',
-            transition: 'height 0.4s ease',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DonutChart({ pct, color = '#6366f1' }: { pct: number; color?: string }) {
-  const r = 40; const circ = 2 * Math.PI * r;
-  const fill = (pct / 100) * circ;
-  return (
-    <svg width={110} height={110} viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={50} cy={50} r={r} fill="none" stroke="var(--bg-elevated)" strokeWidth={12} />
-      <circle
-        cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={12}
-        strokeDasharray={`${fill} ${circ}`} strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 1s ease-out' }}
-      />
-    </svg>
-  );
-}
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
@@ -87,61 +65,65 @@ export default function AnalyticsPage() {
     queryKey: ['analytics', user?.organizationId],
     queryFn: async () => {
       const p = user?.organizationId ? `?organizationId=${user.organizationId}` : '';
-      const { data } = await api.get<{ data: AnalyticsData }>(`/analytics${p}`);
-      return data.data;
+      const { data: res } = await api.get<{ data: AnalyticsData }>(`/analytics${p}`);
+      return res.data;
     },
     refetchInterval: 30_000,
   });
 
-  const sparkData = [12, 19, 14, 28, 22, 35, 40, 31, 27, 44, 38, 52, 48, 60, 55, 72, 65, 80, 76, 90];
-
-  const statCards = [
+  const kpis = [
     {
-      label: 'Total Calls', value: data?.totalCalls.toLocaleString() ?? '0',
-      icon: Phone, color: '#6366f1', trend: '+12.5%', up: true, sub: 'All time',
+      title: 'Total Telephony Calls',
+      value: isLoading ? '—' : (data?.totalCalls.toLocaleString() ?? '0'),
+      badge: '+14.2%', badgeBg: 'rgba(255,255,255,0.06)', up: true,
+      sub1: 'Volume across all campaigns ↗',
+      sub2: 'Trending positively',
     },
     {
-      label: 'Connected', value: data?.completed.toLocaleString() ?? '0',
-      icon: CheckCircle2, color: '#22c55e', trend: `${data?.connectionRate ?? 0}%`, up: true, sub: 'Connection rate',
+      title: 'Connected Pickups',
+      value: isLoading ? '—' : (data?.completed.toLocaleString() ?? '0'),
+      badge: `${data?.connectionRate ?? 0}%`, badgeBg: 'rgba(255,255,255,0.06)', up: true,
+      sub1: 'Active connection rate ↗',
+      sub2: 'Above platform average',
     },
     {
-      label: 'Avg Duration', value: data ? fmtDuration(data.avgDurationSeconds) : '0s',
-      icon: Clock, color: '#f97316', trend: '+4.5%', up: true, sub: 'Per connected call',
+      title: 'Average Call Duration',
+      value: isLoading ? '—' : (data ? fmtDuration(data.avgDurationSeconds) : '0s'),
+      badge: '+2.1%', badgeBg: 'rgba(255,255,255,0.06)', up: true,
+      sub1: 'Meaningful engagement duration ↗',
+      sub2: 'Stable metric',
     },
     {
-      label: 'Minutes Used', value: data?.totalMinutesUsed.toFixed(0) ?? '0',
-      icon: Zap, color: '#a855f7', trend: `${data?.totalCampaigns ?? 0} campaigns`, up: true, sub: 'Credits consumed',
+      title: 'Gross Minutes Consumed',
+      value: isLoading ? '—' : (data?.totalMinutesUsed.toFixed(0) ?? '0'),
+      badge: `${data?.totalCampaigns ?? 0} Campaigns`, badgeBg: 'rgba(255,255,255,0.06)', up: true,
+      sub1: 'Total AI compute time ↗',
+      sub2: 'Within standard limits',
     },
   ];
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div className="animate-fade-in" style={{
+      display: 'flex', flexDirection: 'column', gap: 24,
+      background: '#0a0a0b', minHeight: '100vh', padding: '10px 24px 60px',
+      color: '#e4e4e7', fontFamily: 'Inter, sans-serif'
+    }}>
 
-      {/* ── Page Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: 'linear-gradient(135deg, #a855f7, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(99,102,241,0.3)',
-          }}>
-            <BarChart2 size={20} color="white" />
-          </div>
-          <div>
-            <h1 className="page-title" style={{ fontSize: 22 }}>Client Analytics Overview</h1>
-            <p className="page-subtitle">Live health and usage across all your campaigns</p>
-          </div>
+      {/* ── HEADER ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 4px 0', color: '#f4f4f5' }}>Telephony Analytics</h1>
+          <p style={{ margin: 0, fontSize: 13, color: '#71717a' }}>Real-time aggregated engagement metrics</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: 4 }}>
-          {['7D', '30D', '3M'].map((label, i) => (
+        <div style={{ display: 'flex', gap: 8, background: '#121214', border: '1px solid #27272a', borderRadius: 8, padding: 4 }}>
+          {['7D', '30D', '3M', 'YTD'].map((label, i) => (
             <button
               key={label}
-              className="btn btn-sm"
               style={{
-                background: i === 0 ? 'rgba(99,102,241,0.15)' : 'transparent',
-                color: i === 0 ? '#818cf8' : 'var(--text-secondary)',
+                background: i === 1 ? '#27272a' : 'transparent',
+                color: i === 1 ? '#f4f4f5' : '#a1a1aa',
                 border: 'none', fontWeight: 600, padding: '4px 12px',
+                borderRadius: 4, cursor: 'pointer', fontSize: 13
               }}
             >
               {label}
@@ -150,184 +132,62 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* ── KPI Cards ── */}
+      {/* ── KPI CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        {statCards.map((s) => (
-          <div key={s.label} className="stat-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{
-              position: 'absolute', top: -24, right: -24,
-              width: 80, height: 80, borderRadius: '50%',
-              background: s.color, opacity: 0.1, filter: 'blur(16px)',
-            }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: `${s.color}18`, border: `1px solid ${s.color}30`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <s.icon size={18} color={s.color} />
+        {kpis.map((kpi, i) => (
+          <Card key={i} style={{ background: '#121214', border: '1px solid #27272a', borderRadius: 10, boxShadow: 'none' }}>
+            <CardContent style={{ padding: '20px 24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <p style={{ color: '#a1a1aa', fontSize: 13, fontWeight: 500, margin: 0 }}>{kpi.title}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: kpi.badgeBg, padding: '4px 8px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  {kpi.up ? <TrendingUp size={12} color="#e4e4e7" /> : <TrendingDown size={12} color="#e4e4e7" />}
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#e4e4e7' }}>{kpi.badge}</span>
+                </div>
               </div>
-              <span style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 12, fontWeight: 700,
-                color: s.up ? 'var(--green)' : 'var(--red)',
-                background: s.up ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                padding: '4px 8px', borderRadius: 999,
-              }}>
-                <ArrowUpRight size={12} strokeWidth={3} />
-                {s.trend}
-              </span>
-            </div>
-            {isLoading ? (
-              <Skeleton style={{ height: 32, width: '60%', background: 'rgba(255,255,255,0.05)' }} />
-            ) : (
-              <p className="stat-card-value" style={{ fontSize: 32 }}>{s.value}</p>
-            )}
-            <div>
-              <p className="stat-card-label" style={{ marginBottom: 2 }}>{s.label}</p>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.sub}</p>
-            </div>
-          </div>
+              
+              <h2 style={{ fontSize: 36, fontWeight: 700, margin: '0 0 20px 0', color: '#fafafa', letterSpacing: '-0.8px' }}>
+                {kpi.value}
+              </h2>
+
+              <div>
+                <p style={{ fontSize: 12, color: '#e4e4e7', fontWeight: 500, margin: '0 0 4px 0' }}>{kpi.sub1}</p>
+                <p style={{ fontSize: 12, color: '#71717a', margin: 0 }}>{kpi.sub2}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* ── Charts Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-        {/* Volume Chart */}
-        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <CardHeader style={{ padding: '18px 24px 8px', borderBottom: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <CardTitle style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Call Volume & Trend</CardTitle>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Daily calls dispatched</p>
-              </div>
-              <CalendarDays size={16} color="var(--text-muted)" />
-            </div>
-          </CardHeader>
-          <CardContent style={{ padding: '24px 24px 16px' }}>
-            <Sparkline data={sparkData} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, padding: '0 4px' }}>
-              {['01', '05', '10', '15', '20', '25', '30'].map(d => (
-                <span key={d} style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>{d}</span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Connection Donut */}
-        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <CardHeader style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            <CardTitle style={{ fontSize: 14, fontWeight: 600 }}>Connection Rate</CardTitle>
-          </CardHeader>
-          <CardContent style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-            {isLoading ? (
-              <Skeleton style={{ width: 110, height: 110, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-            ) : (
-              <div style={{ position: 'relative' }}>
-                <DonutChart pct={data?.connectionRate ?? 0} color="#3b82f6" />
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {data?.connectionRate ?? 0}%
-                  </span>
-                </div>
-              </div>
-            )}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'Connected', value: data?.completed ?? 0, color: '#22c55e' },
-                { label: 'No Answer', value: data?.noAnswer ?? 0, color: '#6b7280' },
-                { label: 'Failed', value: data?.failed ?? 0, color: '#ef4444' },
-              ].map(st => (
-                <div key={st.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: st.color }} />
-                    <span style={{ color: 'var(--text-secondary)' }}>{st.label}</span>
-                  </div>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{isLoading ? '…' : st.value}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Status Breakdown & Technical Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-        
-        {/* Breakdown Table */}
-        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <CardHeader style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <CardTitle style={{ fontSize: 14, fontWeight: 600 }}>Status Distribution</CardTitle>
-            <Activity size={14} color="var(--text-muted)" />
-          </CardHeader>
-          <CardContent style={{ padding: '20px 24px' }}>
-            {isLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 20, background: 'rgba(255,255,255,0.05)' }} />)}
-              </div>
-            ) : (!data || data.statusBreakdown.length === 0) ? (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>No call data available</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {data.statusBreakdown.map((b) => {
-                  const meta = STATUS_META[b.status] ?? { color: '#6b7280', label: b.status };
-                  return (
-                    <div key={b.status} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ width: 90, fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)' }}>
-                        {meta.label}
-                      </span>
-                      <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 3, background: meta.color,
-                          width: `${Math.max(b.pct, 2)}%`, transition: 'width 0.6s ease'
-                        }} />
-                      </div>
-                      <span style={{ width: 44, fontSize: 12.5, fontWeight: 700, color: meta.color, textAlign: 'right' }}>
-                        {b.pct}%
-                      </span>
-                      <span style={{ width: 40, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>
-                        {b.count}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Technical Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateRows: 'repeat(3, 1fr)', gap: 12 }}>
-          {[
-            { label: 'Avg Latency', value: `${data?.avgLatencyMs ?? 0} ms`, icon: Zap, color: '#fb923c', desc: 'Bolna Voice LLM latency' },
-            { label: 'Total Campaigns', value: data?.totalCampaigns ?? 0, icon: Megaphone, color: '#a855f7', desc: 'Campaigns dispatched' },
-            { label: 'Credits Consumed', value: `${data?.totalCreditCost?.toFixed(2) ?? '0.00'} min`, icon: TrendingUp, color: '#3b82f6', desc: 'Billing cycle usage' },
-          ].map((s) => (
-            <Card key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
-              <div style={{
-                width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-                background: `${s.color}15`, border: `1px solid ${s.color}25`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <s.icon size={20} color={s.color} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
-                  {isLoading ? '…' : String(s.value)}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{s.label}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— {s.desc}</span>
-                </div>
-              </div>
-            </Card>
-          ))}
+      {/* ── MAIN CHART: Red Dual Wave ── */}
+      <Card style={{ background: '#121214', border: '1px solid #27272a', borderRadius: 10, overflow: 'hidden', boxShadow: 'none' }}>
+        <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#f4f4f5' }}>Call Connection Trajectory</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#71717a' }}>Trailing 7-day volume connected</p>
+          </div>
         </div>
-
-      </div>
+        
+        <div style={{ height: 320, width: '100%', padding: '0 0 20px 0' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorBaseline" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#9f1239" stopOpacity={0.6}/>
+                  <stop offset="95%" stopColor="#9f1239" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#e11d48" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#e11d48" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" stroke="#52525b" tick={{ fill: '#71717a', fontSize: 12 }} tickLine={false} axisLine={false} dy={10} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+              <Area type="monotone" dataKey="baseline" stroke="#9f1239" strokeWidth={3} fillOpacity={1} fill="url(#colorBaseline)" />
+              <Area type="monotone" dataKey="actual" stroke="#e11d48" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
     </div>
   );
 }

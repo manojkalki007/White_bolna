@@ -67,7 +67,7 @@ export default function LoginPage() {
         <div style={{
           position: 'absolute', top: -200, left: -200,
           width: 500, height: 500, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(225,29,72,0.15) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -76,9 +76,9 @@ export default function LoginPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
             <div style={{
               width: 44, height: 44, borderRadius: 12,
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, var(--primary), #be123c)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 24px rgba(99,102,241,0.4)',
+              boxShadow: '0 0 24px rgba(225,29,72,0.4)',
             }}>
               <Zap size={22} color="white" />
             </div>
@@ -89,7 +89,7 @@ export default function LoginPage() {
 
           <h1 style={{ margin: '0 0 12px', fontSize: 40, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1, letterSpacing: '-1px' }}>
             Voice AI<br />
-            <span style={{ background: 'linear-gradient(90deg,#6366f1,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <span style={{ background: 'linear-gradient(90deg,var(--primary),#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               That Converts
             </span>
           </h1>
@@ -102,10 +102,10 @@ export default function LoginPage() {
               <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)',
+                  background: 'rgba(225,29,72,0.12)', border: '1px solid rgba(225,29,72,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <f.icon size={18} color="#818cf8" />
+                  <f.icon size={18} color="#fb7185" />
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{f.label}</p>
@@ -233,7 +233,7 @@ export default function LoginPage() {
         {/* Demo credentials hint */}
         <div style={{
           marginTop: 32, padding: '14px 16px', borderRadius: 10,
-          background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+          background: 'rgba(225,29,72,0.06)', border: '1px solid rgba(225,29,72,0.15)',
         }}>
           <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Super Admin Credentials

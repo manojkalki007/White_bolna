@@ -95,6 +95,13 @@ export default function AgentsPage() {
     staleTime: 30_000,
   });
 
+  const syncAgents = useMutation({
+    mutationFn: async () => {
+      await api.post('/agents/sync');
+    },
+    onSuccess: () => refetch(),
+  });
+
   const deactivate = useMutation({
     mutationFn: (id: string) => api.delete(`/agents/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['agents'] }),
@@ -116,9 +123,9 @@ export default function AgentsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
             width: 44, height: 44, borderRadius: 12,
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            background: 'linear-gradient(135deg, var(--primary), #be123c)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+            boxShadow: '0 0 20px rgba(225,29,72,0.3)',
           }}>
             <Bot size={20} color="white" />
           </div>
@@ -129,12 +136,12 @@ export default function AgentsPage() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            onClick={() => refetch()}
-            disabled={isFetching}
+            onClick={() => syncAgents.mutate()}
+            disabled={syncAgents.isPending}
             className="btn btn-secondary btn-sm"
           >
-            <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
-            Sync
+            <RefreshCw size={13} className={syncAgents.isPending ? 'animate-spin' : ''} />
+            {syncAgents.isPending ? 'Syncing...' : 'Sync Bolna'}
           </button>
           <Link href="/agents/new" className="btn btn-primary" style={{ fontSize: 13 }}>
             <Plus size={14} /> New Agent
@@ -146,7 +153,7 @@ export default function AgentsPage() {
       {!isLoading && agents.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {[
-            { label: 'Total Agents',  value: agents.length,  color: '#6366f1', icon: Bot },
+            { label: 'Total Agents',  value: agents.length,  color: 'var(--primary)', icon: Bot },
             { label: 'Active',         value: activeCount,    color: '#22c55e', icon: CheckCircle2 },
             { label: 'Campaigns',      value: totalCampaigns, color: '#f97316', icon: Megaphone },
             { label: 'Calls Made',     value: totalCalls,     color: '#3b82f6', icon: PhoneCall },
@@ -179,9 +186,9 @@ export default function AgentsPage() {
               onClick={() => setStatusFilter(f)}
               className="btn btn-sm"
               style={{
-                background: statusFilter === f ? 'rgba(99,102,241,0.15)' : 'var(--bg-elevated)',
-                color: statusFilter === f ? '#818cf8' : 'var(--text-secondary)',
-                border: `1px solid ${statusFilter === f ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                background: statusFilter === f ? 'rgba(225,29,72,0.15)' : 'var(--bg-elevated)',
+                color: statusFilter === f ? '#fb7185' : 'var(--text-secondary)',
+                border: `1px solid ${statusFilter === f ? 'rgba(225,29,72,0.3)' : 'var(--border)'}`,
               }}
             >
               {f === 'all' ? `All (${agents.length})` : f === 'ACTIVE' ? `Active (${activeCount})` : `Inactive (${agents.length - activeCount})`}
@@ -210,10 +217,10 @@ export default function AgentsPage() {
         <div className="card" style={{ padding: '72px 24px', textAlign: 'center' }}>
           <div style={{
             width: 64, height: 64, borderRadius: 16, margin: '0 auto 20px',
-            background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)',
+            background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Bot size={28} color="#6366f1" />
+            <Bot size={28} color="var(--primary)" />
           </div>
           <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
             {statusFilter !== 'all' ? 'No agents match this filter' : 'No agents yet'}
@@ -232,7 +239,7 @@ export default function AgentsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 16 }}>
           {filtered.map((agent) => {
             const status = STATUS_META[agent.status] ?? STATUS_META.INACTIVE;
-            const modelColor = LLM_COLORS[agent.llmModel ?? ''] ?? '#6366f1';
+            const modelColor = LLM_COLORS[agent.llmModel ?? ''] ?? 'var(--primary)';
             const modelLabel = MODEL_LABELS[agent.llmModel ?? ''] ?? (agent.llmModel ?? 'Unknown');
 
             return (
@@ -241,16 +248,16 @@ export default function AgentsPage() {
                 {/* Card header */}
                 <div style={{
                   padding: '16px 18px 14px',
-                  background: `linear-gradient(135deg, rgba(99,102,241,0.06), transparent)`,
+                  background: `linear-gradient(135deg, rgba(225,29,72,0.06), transparent)`,
                   borderBottom: '1px solid var(--border)',
                   display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
                       width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      background: 'linear-gradient(135deg, var(--primary), #be123c)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 0 12px rgba(99,102,241,0.3)',
+                      boxShadow: '0 0 12px rgba(225,29,72,0.3)',
                     }}>
                       <Bot size={18} color="white" />
                     </div>
@@ -263,7 +270,7 @@ export default function AgentsPage() {
                         {agent.organization && (
                           <>
                             <span style={{ opacity: 0.4 }}>•</span>
-                            <span style={{ color: '#818cf8', fontFamily: 'Inter, sans-serif' }}>
+                            <span style={{ color: '#fb7185', fontFamily: 'Inter, sans-serif' }}>
                               {user?.role === 'SUPER_ADMIN' ? (agent.organization.brandName || agent.organization.name) : ''}
                             </span>
                           </>
@@ -341,7 +348,7 @@ export default function AgentsPage() {
                     borderTop: '1px solid var(--border)',
                   }}>
                     {[
-                      { label: 'Campaigns', value: agent._count.campaigns, color: '#6366f1' },
+                      { label: 'Campaigns', value: agent._count.campaigns, color: 'var(--primary)' },
                       { label: 'Calls', value: agent._count.callLogs, color: '#22c55e' },
                     ].map((s, i) => (
                       <div key={s.label} style={{

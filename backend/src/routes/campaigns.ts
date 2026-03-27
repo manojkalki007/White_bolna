@@ -253,17 +253,26 @@ router.post(
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const { organizationId, page = '1', limit = '20' } = req.query as Record<string, string>;
-    if (!organizationId) throw createError('organizationId is required', 400);
+    // req.user is guaranteed by requireAuth middleware injected at index.ts
+    const user = (req as any).user; 
 
+    const { organizationId, page = '1', limit = '20' } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Tenant Isolation Logic
+    // SUPER_ADMIN can view all campaigns or filter by specific organizationId.
+    // Standard users are hard-locked to their own organization.
+    const where: any = user.role === 'SUPER_ADMIN'
+      ? (organizationId ? { organizationId } : {})
+      : { organizationId: user.organizationId };
 
     const [campaigns, total] = await Promise.all([
       prisma.campaign.findMany({
-        where: { organizationId },
+        where,
         include: {
           createdBy: { select: { name: true, email: true } },
           agent: { select: { name: true, voiceId: true } },
+          organization: { select: { name: true } }, // Useful for Super Admin
         },
         orderBy: { createdAt: 'desc' },
         skip,

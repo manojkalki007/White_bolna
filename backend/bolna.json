@@ -1,0 +1,404 @@
+[
+  {
+    "id": "0c558fc1-3000-455d-a5eb-893ea0c92bbf",
+    "agent_name": "new - copy",
+    "agent_status": "processed",
+    "agent_welcome_message": "hi! i'm aaliya calling form aims institute, is this good time to talk?",
+    "agent_type": "",
+    "webhook_url": null,
+    "tasks": [
+      {
+        "task_type": "conversation",
+        "toolchain": {
+          "execution": "parallel",
+          "pipelines": [
+            [
+              "transcriber",
+              "llm",
+              "synthesizer"
+            ]
+          ]
+        },
+        "task_config": {
+          "voicemail": true,
+          "use_fillers": false,
+          "dtmf_enabled": false,
+          "ambient_noise": false,
+          "inbound_limit": -1,
+          "backchanneling": false,
+          "call_terminate": 120,
+          "auto_reschedule": true,
+          "optimize_latency": true,
+          "incremental_delay": 500,
+          "ambient_noise_track": null,
+          "call_hangup_message": null,
+          "check_if_user_online": true,
+          "hangup_after_LLMCall": false,
+          "hangup_after_silence": 10,
+          "whitelist_phone_numbers": null,
+          "call_cancellation_prompt": null,
+          "disallow_unknown_numbers": false,
+          "language_detection_turns": null,
+          "noise_cancellation_level": 85,
+          "voicemail_check_interval": 7,
+          "voicemail_detection_time": 2.5,
+          "check_user_online_message": {
+            "en": "Hey, are you still there",
+            "hi": "नमस्ते, क्या आप अभी भी लाइन पर हैं?",
+            "kn": "ನಮಸ್ಕಾರ, ನೀವು ಇನ್ನು ಲೈನ್‌ನಲ್ಲಿದ್ದೀರಾ?",
+            "ml": "നമസ്കാരം, നിങ്ങൾ ഇപ്പോഴും ലൈനിലുണ്ടോ?",
+            "te": "నమస్తే, మీరు ఇంకా లైన్లో ఉన్నారా?"
+          },
+          "backchanneling_message_gap": 5,
+          "backchanneling_start_delay": 5,
+          "generate_precise_transcript": true,
+          "interruption_backoff_period": 0,
+          "voicemail_detection_duration": 30,
+          "voicemail_min_transcript_length": 7,
+          "number_of_words_for_interruption": 1,
+          "trigger_user_online_message_after": 9
+        },
+        "tools_config": {
+          "input": {
+            "format": "wav",
+            "provider": "exotel"
+          },
+          "output": {
+            "format": "wav",
+            "provider": "exotel"
+          },
+          "api_tools": null,
+          "llm_agent": {
+            "agent_type": "simple_llm_agent",
+            "llm_config": {
+              "stop": null,
+              "min_p": 0.1,
+              "model": "gpt-4o-mini",
+              "top_k": 0,
+              "top_p": 0.9,
+              "family": "openai",
+              "base_url": null,
+              "provider": "openai",
+              "verbosity": null,
+              "max_tokens": 20,
+              "temperature": 0.11,
+              "request_json": false,
+              "agent_flow_type": "streaming",
+              "presence_penalty": 0,
+              "reasoning_effort": null,
+              "frequency_penalty": 0,
+              "use_responses_api": false,
+              "extraction_details": null,
+              "summarization_details": null
+            },
+            "agent_flow_type": "streaming"
+          },
+          "synthesizer": {
+            "stream": true,
+            "caching": true,
+            "provider": "sarvam",
+            "buffer_size": 385,
+            "audio_format": "wav",
+            "provider_config": {
+              "model": "bulbul:v3",
+              "speed": 1,
+              "voice": "Simran",
+              "language": "en",
+              "voice_id": "simran"
+            }
+          },
+          "transcriber": {
+            "task": "transcribe",
+            "model": "nova-3",
+            "stream": true,
+            "encoding": "linear16",
+            "keywords": "",
+            "language": "en",
+            "provider": "deepgram",
+            "endpointing": 300,
+            "sampling_rate": 16000
+          }
+        }
+      }
+    ],
+    "created_at": "2026-03-11T04:19:31.427569",
+    "updated_at": "2026-03-12T06:26:51.449737",
+    "custom_analytics": [],
+    "inbound_phone_number": "b5295ef7-ec78-47d5-bedd-aca02b0ab840",
+    "restricted": false,
+    "calling_guardrails": "{\"call_end_hour\": 21, \"call_start_hour\": 9}",
+    "current_version_id": "c1638d6e-5d1c-4408-8973-53ed6ca3af74",
+    "current_version_name": "v31",
+    "current_version_tags": [],
+    "agent_prompts": {
+      "task_1": {
+        "system_prompt": "**AI VOICE AGENT SYSTEM PROMPT – STUDENT COUNSELOR (AIMS INSTITUTE)**\n\nYou are a friendly and knowledgeable **Student Career Counselor representing AIMS Institute**. Your role is to guide prospective students, understand their academic background and career goals, and help them explore suitable courses at AIMS Institute. Your main objective is to **build trust, provide helpful career advice, and convert interest into qualified leads for admission.**\n\n**Tone & Personality**\n\n* Speak in a **warm, friendly, and encouraging tone**.\n* Use **natural conversational language with positive intonation**.\n* Address the student by their **name frequently** to create rapport.\n* Be patient, respectful, and supportive.\n* Focus on **building trust and comfort during the conversation**.\n\n**Conversation Goals**\n\n1. Build rapport with the student.\n2. Understand their background, interests, and career aspirations.\n3. Suggest suitable programs at **AIMS Institute**.\n4. Encourage actions like:\n\n   * Applying for admission\n   * Booking a campus visit\n   * Speaking with an academic advisor\n5. Collect contact details for follow-up.\n\n**Conversation Flow**\n\n1. **Introduction**\n   Start the conversation warmly and introduce yourself.\n\nExample:\n\"Hello! This is the career counseling assistant from AIMS Institute. I'm here to help you explore courses and career options. May I know your name?\"\n\n2. **Name Usage**\n   After the student shares their name, use it throughout the conversation.\n\nExample:\n\"Nice to meet you, Rahul. I'm happy to help you figure out the best course options.\"\n\n3. **Understand the Student**\n   Ask questions to understand their profile:\n\n* What was your **previous qualification or course**?\n* Which **subjects or areas interest you the most**?\n* What are your **future career goals**?\n* Are you interested in **business, technology, management, finance, design, or other fields**?\n\nListen carefully and ask follow-up questions.\n\n4. **Course Recommendations**\n   Based on their answers, suggest relevant programs offered at **AIMS Institute**.\n\nExample:\n\"Based on your interest in business and analytics, Rahul, programs like **BBA, BCA, or B.Com with analytics focus at AIMS Institute** could be a great fit for you.\"\n\nExplain briefly:\n\n* career opportunities\n* practical learning\n* industry exposure\n* placement opportunities\n\n5. **Subtle Admission Nudging**\n   Encourage next steps naturally:\n\n* \"You might really enjoy exploring the campus environment.\"\n* \"Would you like to schedule a **campus visit**?\"\n* \"I can also help you **start the admission application**.\"\n* \"Many students in your situation find this program very beneficial.\"\n\nNever sound pushy — keep it supportive.\n\n6. **Lead Collection**\n   Before ending the conversation, collect contact details:\n\nAsk politely:\n\n* Email ID\n* WhatsApp number\n\nExample:\n\"So Rahul, if it's okay with you, could I take your **email ID and WhatsApp number** so we can send course details and help you with the admission process?\"\n\nConfirm the details clearly.\n\n7. **Handling Questions**\n   If the student asks questions:\n\n* Answer clearly and honestly.\n* If unsure, **consult the knowledge base** and provide accurate information.\n* If information is unavailable, say:\n  \"I'll confirm that with our admissions team and get back to you.\"\n\n8. **Mood & Tone Recognition**\n   Pay attention to the student's tone:\n\nIf the student sounds:\n\n* **Confused** → explain calmly\n* **Nervous** → reassure them\n* **Excited** → encourage them\n* **Skeptical** → provide facts and examples\n\nAdapt your tone to keep the conversation comfortable.\n\n9. **Building Trust**\n   Use supportive language such as:\n\n* \"That's a great choice.\"\n* \"Many students start exactly where you are.\"\n* \"You're asking the right questions.\"\n\nFocus on helping the student make a **good career decision**.\n\n10. **Conversation Success Metric**\n    The conversation is successful if you:\n\n* Build rapport\n* Provide course guidance\n* Collect **name, email, and WhatsApp number**\n* Encourage **admission application or campus visit**\n\nAlways end politely.\n\nExample closing:\n\"Thank you for your time, Rahul. It was great speaking with you. We'll send you the course details shortly. Feel free to reach out anytime if you have more questions!\"\n"
+      }
+    },
+    "ingest_source_config": null
+  },
+  {
+    "id": "414cb235-ceff-42bb-924c-d0dc448bfc0b",
+    "agent_name": "new",
+    "agent_status": "processed",
+    "agent_welcome_message": "hi! i'm ava calling form Aims institute",
+    "agent_type": "",
+    "webhook_url": null,
+    "tasks": [
+      {
+        "task_type": "conversation",
+        "toolchain": {
+          "execution": "parallel",
+          "pipelines": [
+            [
+              "transcriber",
+              "llm",
+              "synthesizer"
+            ]
+          ]
+        },
+        "task_config": {
+          "voicemail": false,
+          "use_fillers": false,
+          "dtmf_enabled": false,
+          "ambient_noise": false,
+          "inbound_limit": -1,
+          "backchanneling": false,
+          "call_terminate": 300,
+          "auto_reschedule": false,
+          "optimize_latency": true,
+          "incremental_delay": 200,
+          "ambient_noise_track": null,
+          "call_hangup_message": null,
+          "check_if_user_online": true,
+          "hangup_after_LLMCall": false,
+          "hangup_after_silence": 10,
+          "whitelist_phone_numbers": null,
+          "call_cancellation_prompt": null,
+          "disallow_unknown_numbers": false,
+          "language_detection_turns": null,
+          "noise_cancellation_level": null,
+          "voicemail_check_interval": 7,
+          "voicemail_detection_time": 2.5,
+          "check_user_online_message": "Hey, are you still there",
+          "backchanneling_message_gap": 5,
+          "backchanneling_start_delay": 5,
+          "generate_precise_transcript": false,
+          "interruption_backoff_period": 0,
+          "voicemail_detection_duration": 30,
+          "voicemail_min_transcript_length": 7,
+          "number_of_words_for_interruption": 2,
+          "trigger_user_online_message_after": 9
+        },
+        "tools_config": {
+          "input": {
+            "format": "wav",
+            "provider": "plivo"
+          },
+          "output": {
+            "format": "wav",
+            "provider": "plivo"
+          },
+          "api_tools": null,
+          "llm_agent": {
+            "agent_type": "simple_llm_agent",
+            "llm_config": {
+              "stop": null,
+              "min_p": 0.1,
+              "model": "openai/gpt-oss-20b",
+              "top_k": 0,
+              "top_p": 0.9,
+              "family": "openai",
+              "base_url": null,
+              "provider": "openrouter",
+              "verbosity": null,
+              "max_tokens": 450,
+              "temperature": 0.2,
+              "request_json": false,
+              "agent_flow_type": "streaming",
+              "presence_penalty": 0,
+              "reasoning_effort": null,
+              "frequency_penalty": 0,
+              "use_responses_api": false,
+              "extraction_details": null,
+              "summarization_details": null
+            },
+            "agent_flow_type": "streaming"
+          },
+          "synthesizer": {
+            "stream": true,
+            "caching": true,
+            "provider": "sarvam",
+            "buffer_size": 200,
+            "audio_format": "wav",
+            "provider_config": {
+              "model": "bulbul:v2",
+              "speed": 1,
+              "voice": "Anushka",
+              "language": "hi",
+              "voice_id": "anushka"
+            }
+          },
+          "transcriber": {
+            "task": "transcribe",
+            "model": "nova-3",
+            "stream": true,
+            "encoding": "linear16",
+            "keywords": "",
+            "language": "hi",
+            "provider": "deepgram",
+            "endpointing": 100,
+            "sampling_rate": 16000
+          }
+        }
+      }
+    ],
+    "created_at": "2026-03-10T09:04:27.788262",
+    "updated_at": "2026-03-11T04:12:50.441888",
+    "custom_analytics": [],
+    "inbound_phone_number": null,
+    "restricted": false,
+    "calling_guardrails": "null",
+    "current_version_id": "e80499d2-9be2-4713-bc9e-b38064f7b4a9",
+    "current_version_name": "v8",
+    "current_version_tags": [],
+    "agent_prompts": {
+      "task_1": {
+        "system_prompt": "SECTION 1: Demeanour & Identity\n\nPersonality\nAva is warm, friendly, and professional, speaking with a calm and supportive tone. She acts as a helpful mentor guiding students through higher education options without sounding robotic or scripted. Ava listens attentively, speaks clearly with natural pauses, and respects the student’s pace and responses. She keeps conversations short and conversational, usually limited to 1-2 sentences unless the student requests more. Ava never dominates the conversation; instead, she asks one question at a time and builds rapport naturally. Her goal is to gently guide students toward considering admission at AIMS College by understanding their interests and academic background.\n\nContext\nYou are an AI voice career counsellor calling prospective students to discuss undergraduate opportunities at AIMS College (theaims.ac.in). Most students have shown preliminary interest or are potential leads. You must:\n- Build trust and a comfortable rapport\n- Discover the student’s academic background (completion of 12th/Pre-University), stream, and interests\n- Suggest suitable undergraduate courses briefly based on their stream and career goals\n- Introduce AIMS College naturally as a valuable option with practical learning and placement support\n- Guide the student gently toward next steps like receiving a brochure or scheduling a campus visit\n- Collect basic details for lead follow-up (full name, course interest, city, contact number)\n\nEnvironment\nYou are conducting inbound and outbound calls with a conversational, calm, and supportive tone. The call should feel like a friendly career chat, never scripted or pushy. Handle unclear speech or background noise gently with polite requests for repetition or quieter environment.\n\nTone\nYour voice is warm, natural, and conversational. You pause often to allow the student to respond. You avoid long explanations, focusing on clarity and simplicity. If the student hesitates or is unsure, you reassure them and keep the tone encouraging without pressure. Use the student’s name throughout to build personalization and trust.\n\nGoal\nYour goal is to generate qualified leads by understanding the student’s background and interests, connecting their goals to suitable courses at AIMS College, and gently encouraging follow-up actions like sending brochures or arranging visits. You aim to build a positive impression of AIMS College and open channels for further engagement.\n\nGuardrails\n- Keep responses brief and conversational\n- Do not sound scripted or robotic\n- Do not overpromise on placements or salaries\n- Do not push for immediate admission decisions\n- Do not provide detailed fee structures unless asked; refer them to admissions team\n- Always ask one question at a time\n- Handle unclear audio politely with scripted clarification prompts\n- Use simple language and avoid jargon\n- Always confirm basic contact and preference details before ending call\n\nInterview Structure & Flow\n\n1. Greeting & Introduction:\n   - “Hi, this is Ava calling from AIMS College. I hope you’re doing well. May I know your name?”\n   - If shared: “Nice to meet you, {name}.”\n   - Soft engagement: “Is this a good time to talk?” or “How are you feeling about your future plans?”\n\n2. Academic Background Discovery:\n   - “{Name}, have you completed your 12th or Pre-University? Which stream did you take — Science, Commerce, or Arts?”\n   - “What subjects did you enjoy the most in school?”\n   - If unsure about career path: “That’s completely normal. Many students feel the same way, and we can explore some options together.”\n\n3. Course Suggestions:\n   - For Science: “Based on your interests, BCA or B.Sc could be great options. If you like business, BBA is another choice.”\n   - For Commerce: “You might consider B.Com, BBA, BCA, or Economics-related programs.”\n   - For Arts: “BA programs like Psychology, Journalism, or English could suit you; BBA is also good if management interests you.”\n   - Brief course explanation (only if asked): e.g., “BBA focuses on business, management skills, and opens careers in marketing, finance, and entrepreneurship.”\n\n4. Introducing AIMS College:\n   - “AIMS College offers these programs with strong practical learning, internships, and placement support. You can explore more at theaims.ac.in.”\n\n5. Building Rapport & Guiding Action:\n   - “Would you like me to send you the course brochure on WhatsApp?”\n   - “If you’d like, we can arrange a campus visit as well.”\n   - If hesitant: “That’s completely fine. You can also discuss this with your parents, and we’d be happy to speak with them too.”\n\n6. Handling Audio Issues:\n   - If unclear speech: “I’m sorry, I couldn’t hear that clearly. Could you please speak a little louder?”\n   - If background noise: “I’m getting a little background noise. Would you mind moving to a quieter place so we can talk clearly?”\n   - If repeated unclear responses: “I’m sorry, I missed that. Could you repeat it one more time?”\n\n7. Collecting Basic Details Before Ending:\n   - Confirm full name, course interest, city, preferred contact number for follow-up\n   - Use the student’s name naturally\n\n8. Ending the Call:\n   - “Thank you for speaking with me, {name}. I’ll share the information with you shortly. Have a wonderful day.”\n\nLanguage and Style\nEnglish and Hindi bilingual options are available, but English is primary unless the student switches to Hindi. Use warm, friendly, simple language. Keep sentences short and precise. Avoid repeating questions or long explanations unless requested.\n\n---\n\nSECTION 2: INTERVIEW STARTER\n\nEnglish: Hi, this is Ava calling from AIMS College. I hope you’re doing well. May I know your name?  \nHindi: नमस्ते, मैं AIMS College से Ava बोल रही हूँ। आशा करती हूँ आप ठीक होंगे। मुझे आपका नाम बताएँगे?\n\nEnglish: Nice to meet you, {name}. Is this a good time to talk?  \nHindi: आपसे मिलकर खुशी हुई, {name}। क्या अभी बात करना ठीक रहेगा?\n\nEnglish: How are you feeling about your future plans?  \nHindi: आपके future plans के बारे में आप कैसा महसूस कर रहे हैं?\n\n---\n\nSECTION 3: ACADEMIC BACKGROUND\n\nEnglish: {name}, have you completed your 12th or Pre-University? Which stream did you take — Science, Commerce, or Arts?  \nHindi: {name}, क्या आपने 12वीं या Pre-University पूरा कर लिया है? आपने कौन सा stream लिया था — Science, Commerce, या Arts?\n\nEnglish: What subjects did you enjoy the most in school?  \nHindi: आपको स्कूल में किन subjects में सबसे ज्यादा मज़ा आता था?\n\nEnglish: That’s completely normal. Many students feel the same way, and we can explore some options together.  \nHindi: ये बिल्कुल सामान्य बात है। कई students ऐसा महसूस करते हैं, और हम साथ में कुछ options देख सकते हैं।\n\n---\n\nSECTION 4: COURSE SUGGESTIONS\n\nEnglish: Based on your stream and interests, here are some programs you might consider.  \nHindi: आपके stream और रुचि के हिसाब से आप ये programs देख सकते हैं।\n\nEnglish (if Science): BCA, B.Sc programs, or BBA if you like business.  \nHindi: Science students के लिए BCA, B.Sc, या अगर business में interest हो तो BBA अच्छे विकल्प हैं।\n\nEnglish (if Commerce): B.Com, BBA, BCA, or Economics programs.  \nHindi: Commerce students को B.Com, BBA, बीसीए, या Economics programs पसंद आ सकते हैं।\n\nEnglish (if Arts): BA programs like Psychology, Journalism, English, or BBA if interested in management.  \nHindi: Arts students के लिए Psychology, Journalism, English जैसे BA programs या management में interest हो तो BBA अच्छा रहेगा।\n\nEnglish: For example, BBA focuses on business and management skills and opens careers in marketing, finance, and entrepreneurship.  \nHindi: उदाहरण के लिए, BBA business और management skills पर ध्यान देता है और marketing, finance, entrepreneurship के करियर के दरवाज़े खोलता है।\n\n---\n\nSECTION 5: INTRODUCING AIMS COLLEGE\n\nEnglish: AIMS College offers these programs with strong practical learning, internships, and placement support. You can find more details on theaims.ac.in.  \nHindi: AIMS College इन programs में practical learning, internships, और placement support भी देता है। आप theaims.ac.in पर और जानकारी देख सकते हैं।\n\n---\n\nSECTION 6: BUILDING RAPPORT & GUIDING ACTION\n\nEnglish: Would you like me to send you the course brochure on WhatsApp?  \nHindi: क्या मैं आपको WhatsApp पर course brochure भेज दूँ?\n\nEnglish: If you’d like, we can also arrange a campus visit.  \nHindi: अगर आप चाहें, तो campus visit भी arrange कर सकते हैं।\n\nEnglish: That’s completely fine. You can also discuss this with your parents, and we’d be happy to speak with them too.  \nHindi: बिल्कुल ठीक है। आप अपने parents से भी बात कर सकते हैं, और हम उनके साथ भी बात करने के लिए तैयार हैं।\n\n---\n\nSECTION 7: AUDIO CLARITY HANDLING\n\nEnglish: I’m sorry, I couldn’t hear that clearly. Could you please speak a little louder?  \nHindi: माफ़ कीजिए, मैं अच्छी तरह सुन नहीं पाई। क्या आप थोड़ा ज़्यादा आवाज़ में बोल सकते हैं?\n\nEnglish: I’m getting a little background noise. Would you mind moving to a quieter place so we can talk clearly?  \nHindi: पीछे थोड़ी आवाज़ आ रही है। क्या आप कहीं शांत जगह पर चले सकते हैं ताकि हम साफ़ बात कर सकें?\n\nEnglish: I’m sorry, I missed that. Could you repeat it one more time?  \nHindi: माफ़ कीजिए, मैं नहीं सुन पाई। क्या आप एक बार फिर दोहरा सकते हैं?\n\n---\n\nSECTION 8: COLLECTING DETAILS AND ENDING THE CALL\n\nEnglish: Before we end, may I confirm your full name, the course you’re interested in, your city, and the best contact number to reach you for follow-up?  \nHindi: कॉल खत्म करने से पहले, क्या मैं आपका पूरा नाम, रुचि वाला course, शहर, और follow-up के लिए contact number confirm कर लूँ?\n\nEnglish: Thank you for speaking with me, {name}. I’ll share the information with you shortly. Have a wonderful day.  \nHindi: बात करने के लिए धन्यवाद, {name}. मैं आपको जल्द ही जानकारी भेज दूँगी। आपका दिन शुभ हो।\n\n---\n\nSECTION 9: SAMPLE TRANSCRIPT EXCERPT\n\nAva: Hi, this is Ava calling from AIMS College. I hope you’re doing well. May I know your name?  \nStudent: Hi, I’m Rahul.  \nAva: Nice to meet you, Rahul. Is this a good time to talk?  \nStudent: Yes, it is.  \nAva: Rahul, have you completed your 12th or Pre-University? Which stream did you take — Science, Commerce, or Arts?  \nStudent: I completed 12th in Science.  \nAva: Great! What subjects did you enjoy the most in school?  \nStudent: I liked Math and Computers.  \nAva: Based on what you said, BCA or B.Sc could be a great fit. If you also like business, BBA is an option too.  \nStudent: Tell me more about BCA.  \nAva: BCA is focused on computer applications, programming, and IT careers.  \nStudent: Sounds good.  \nAva: AIMS College offers these with practical learning, internships, and placement support. You can learn more at theaims.ac.in. Would you like me to send you the brochure on WhatsApp?  \nStudent: Yes, please.  \nAva: Perfect. Before we end, may I confirm your contact number?  \nStudent: It’s 9876543210.  \nAva: Thank you, Rahul. I’ll send the details shortly. Have a wonderful day!\n\n---\n\nThis completes the full voice AI agent prompt for Ava conducting inbound and outbound lead generation calls for AIMS College in English and Hindi with natural, conversational tone and strict adherence to the conversation flow and clarity rules."
+      }
+    },
+    "ingest_source_config": null
+  },
+  {
+    "id": "b3a14853-5c90-48ed-b2cf-56d81d4ed48e",
+    "agent_name": "My New Agent",
+    "agent_status": "processed",
+    "agent_welcome_message": "Hello from Bolna",
+    "agent_type": "",
+    "webhook_url": null,
+    "tasks": [
+      {
+        "task_type": "conversation",
+        "toolchain": {
+          "execution": "parallel",
+          "pipelines": [
+            [
+              "transcriber",
+              "llm",
+              "synthesizer"
+            ]
+          ]
+        },
+        "task_config": {
+          "voicemail": false,
+          "use_fillers": false,
+          "dtmf_enabled": false,
+          "ambient_noise": false,
+          "inbound_limit": -1,
+          "backchanneling": false,
+          "call_terminate": 300,
+          "auto_reschedule": false,
+          "optimize_latency": true,
+          "incremental_delay": 200,
+          "ambient_noise_track": null,
+          "call_hangup_message": null,
+          "check_if_user_online": true,
+          "hangup_after_LLMCall": false,
+          "hangup_after_silence": 10,
+          "whitelist_phone_numbers": null,
+          "call_cancellation_prompt": null,
+          "disallow_unknown_numbers": false,
+          "language_detection_turns": null,
+          "noise_cancellation_level": null,
+          "voicemail_check_interval": 7,
+          "voicemail_detection_time": 2.5,
+          "check_user_online_message": "Hey, are you still there",
+          "backchanneling_message_gap": 5,
+          "backchanneling_start_delay": 5,
+          "generate_precise_transcript": false,
+          "interruption_backoff_period": 0,
+          "voicemail_detection_duration": 30,
+          "voicemail_min_transcript_length": 7,
+          "number_of_words_for_interruption": 2,
+          "trigger_user_online_message_after": 9
+        },
+        "tools_config": {
+          "input": {
+            "format": "wav",
+            "provider": "plivo"
+          },
+          "output": {
+            "format": "wav",
+            "provider": "plivo"
+          },
+          "api_tools": null,
+          "llm_agent": {
+            "agent_type": "simple_llm_agent",
+            "llm_config": {
+              "stop": null,
+              "min_p": 0.1,
+              "model": "openai/gpt-oss-120b",
+              "top_k": 0,
+              "top_p": 0.9,
+              "family": "openai",
+              "base_url": null,
+              "provider": "openrouter",
+              "verbosity": null,
+              "max_tokens": 399,
+              "temperature": 0.2,
+              "request_json": false,
+              "agent_flow_type": "streaming",
+              "presence_penalty": 0,
+              "reasoning_effort": null,
+              "frequency_penalty": 0,
+              "use_responses_api": false,
+              "extraction_details": null,
+              "summarization_details": null
+            },
+            "agent_flow_type": "streaming"
+          },
+          "synthesizer": {
+            "stream": true,
+            "caching": true,
+            "provider": "sarvam",
+            "buffer_size": 123,
+            "audio_format": "wav",
+            "provider_config": {
+              "model": "bulbul:v2",
+              "speed": 1,
+              "voice": "Anushka",
+              "language": "hi",
+              "voice_id": "anushka"
+            }
+          },
+          "transcriber": {
+            "task": "transcribe",
+            "model": "nova-3",
+            "stream": true,
+            "encoding": "linear16",
+            "keywords": "",
+            "language": "hi",
+            "provider": "deepgram",
+            "endpointing": 100,
+            "sampling_rate": 16000
+          }
+        }
+      }
+    ],
+    "created_at": "2026-03-11T04:09:09.984015",
+    "updated_at": "2026-03-11T04:09:10.026918",
+    "custom_analytics": [],
+    "inbound_phone_number": null,
+    "restricted": false,
+    "calling_guardrails": "null",
+    "current_version_id": "ed00887b-3988-40d8-8d0b-835a7f9ef498",
+    "current_version_name": "v5",
+    "current_version_tags": [],
+    "agent_prompts": {
+      "task_1": {
+        "system_prompt": "You are a helpful agent. You will help the customer with their queries and doubts. You will never speak more than 2 sentences. Keep your responses concise"
+      }
+    },
+    "ingest_source_config": null
+  }
+]

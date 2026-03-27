@@ -145,7 +145,7 @@ export async function listBolnaAgents(
   org?: OrgBolnaCredentials
 ): Promise<BolnaAgentResponse[]> {
   const client = org ? getOrgClient(org) : bolnaClient;
-  const res = await client.get('/agent');
+  const res = await client.get('/agent/all');
   // Bolna returns { agents: [...] } or a direct array
   return res.data?.agents ?? res.data?.data ?? res.data ?? [];
 }

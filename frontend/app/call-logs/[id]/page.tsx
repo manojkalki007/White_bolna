@@ -36,7 +36,7 @@ interface CallLog {
 const STATUS_COLOR: Record<string, string> = {
   COMPLETED: '#22c55e', FAILED: '#f87171',
   NO_ANSWER: '#f59e0b', BUSY: '#f59e0b',
-  IN_CALL: '#6366f1', INITIATED: '#94a3b8', PENDING: '#94a3b8',
+  IN_CALL: 'var(--primary)', INITIATED: '#94a3b8', PENDING: '#94a3b8',
 };
 
 export default function CallLogDetailPage({ params }: PageProps) {
@@ -97,7 +97,7 @@ export default function CallLogDetailPage({ params }: PageProps) {
       {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         {[
-          { icon: <Phone size={14} color="#6366f1" />, label: 'Phone', value: log.contact?.phoneNumber ?? '—' },
+          { icon: <Phone size={14} color="var(--primary)" />, label: 'Phone', value: log.contact?.phoneNumber ?? '—' },
           { icon: <Clock size={14} color="#22c55e" />, label: 'Duration', value: log.duration ? `${log.duration}s` : '—' },
           { icon: <Zap size={14} color="#f59e0b" />, label: 'Avg Latency', value: log.avgLatencyMs ? `${log.avgLatencyMs}ms` : '—' },
           { icon: <Activity size={14} color="#a855f7" />, label: 'Credit', value: log.creditCost ? `${log.creditCost.toFixed(2)} min` : '—' },

@@ -129,6 +129,59 @@ router.post(
   })
 );
 
+// ─── POST /api/agents/sync ───────────────────────────────────────────────────
+router.post(
+  '/sync',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const org = await getOrgCredentials(req.user!.organizationId);
+    const bolnaAgents = await listBolnaAgents(org);
+    
+    let syncedCount = 0;
+    
+    for (const bAgent of bolnaAgents) {
+      const agentId = bAgent.agent_id || bAgent.id;
+      if (!agentId) continue;
+      
+      const existing = await prisma.bolnaAgent.findFirst({
+        where: { bolnaAgentId: agentId, organizationId: org.id }
+      });
+      
+      if (!existing) {
+        // Extract configs safely
+        const agentName = bAgent.agent_name || bAgent.name || 'Imported Agent';
+        // When pulling from /agent/all, configs are buried under tasks[0].tools_config
+        const task0 = (bAgent.tasks && bAgent.tasks[0]) || {};
+        const toolsConfig = task0.tools_config || {};
+        const llmConfig = toolsConfig.llm_agent?.llm_config || {};
+        const synthesizer = toolsConfig.synthesizer?.provider_config || {};
+        
+        await prisma.bolnaAgent.create({
+          data: {
+            organizationId: org.id,
+            bolnaAgentId: agentId,
+            name: agentName,
+            systemPrompt: bAgent.agent_prompts?.task_1?.system_prompt || '(Imported)',
+            llmModel: llmConfig.model || 'gpt-4o-mini',
+            llmProvider: 'openai',
+            temperature: llmConfig.temperature || 0.7,
+            voiceId: synthesizer.voice_id || 'ritu',
+            voiceProvider: synthesizer.provider || 'bolna',
+            language: synthesizer.language || 'en',
+            ambientNoiseDetection: true,
+            interruptionThreshold: 0.5,
+            bufferingDelay: 100,
+            rawConfig: bAgent as any,
+            status: 'ACTIVE',
+          }
+        });
+        syncedCount++;
+      }
+    }
+    
+    res.json({ success: true, syncedCount });
+  })
+);
+
 // ─── GET /api/agents ─────────────────────────────────────────────────────────
 router.get(
   '/',

@@ -32,16 +32,42 @@ router.get(
       timeout: 30_000,
     });
 
-    const response = await client.get('/phone-numbers');
-    const raw = response.data?.data ?? response.data ?? [];
+    let raw: any[] = [];
+    
+    try {
+      // Some versions of Bolna reject un-parameterized /phone-numbers
+      const response = await client.get('/phone-numbers');
+      raw = response.data?.data ?? response.data ?? [];
+    } catch (err: any) {
+      // Fallback: If Bolna restricts the direct list query, infer the active DIDs from our known agent configs
+      if (err.response?.status === 400 || err.response?.status === 404) {
+        const localAgents = await prisma.bolnaAgent.findMany({
+          where: { organizationId: req.user!.organizationId },
+          select: { fromNumber: true, name: true, id: true }
+        });
+        
+        raw = localAgents
+          .filter(a => a.fromNumber)
+          .map(a => ({
+            id: a.id,
+            phone_number: a.fromNumber,
+            friendlyName: `Agent Assignment: ${a.name}`,
+            status: 'active',
+            capabilities: { voice: true }
+          }));
+      } else {
+        throw err;
+      }
+    }
 
     const numbers = (Array.isArray(raw) ? raw : []).map((n: any) => ({
       id: n.id ?? n._id,
       phone_number: n.phone_number ?? n.phoneNumber ?? '',
-      country: n.country ?? n.attributes?.provider ?? '',
+      country: n.country ?? n.attributes?.provider ?? 'US/IN',
       status: n.status ?? (n.isActive ? 'active' : 'inactive'),
       agent_id: n.agent_id ?? n.agentId ?? null,
-      capabilities: { voice: true },
+      friendlyName: n.friendlyName ?? null,
+      capabilities: n.capabilities || { voice: true },
     }));
 
     res.json({ success: true, data: numbers });

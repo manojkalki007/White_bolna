@@ -52,7 +52,7 @@ export default function NumbersPage() {
         <div className="card" style={{ padding: '64px 24px', textAlign: 'center' }}>
           <div style={{
             width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
-            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+            background: 'rgba(225,29,72,0.1)', border: '1px solid rgba(225,29,72,0.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Phone size={24} color="var(--accent)" />

@@ -92,7 +92,7 @@ export default function SettingsPage() {
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                   padding: '9px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
-                  background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                  background: active ? 'rgba(225,29,72,0.12)' : 'transparent',
                   color: active ? 'var(--accent)' : 'var(--text-secondary)',
                   fontSize: 13, fontWeight: active ? 600 : 400,
                   transition: 'all 0.15s',
@@ -203,7 +203,7 @@ export default function SettingsPage() {
                 {[
                   { label: 'Available', value: `${(org?.creditBalance ?? 0).toFixed(1)} min`, color: '#22c55e' },
                   { label: 'Used', value: `${(org?.creditUsed ?? 0).toFixed(1)} min`, color: '#f59e0b' },
-                  { label: 'Limit', value: `${(org?.creditLimit ?? 0).toFixed(0)} min`, color: '#6366f1' },
+                  { label: 'Limit', value: `${(org?.creditLimit ?? 0).toFixed(0)} min`, color: 'var(--primary)' },
                 ].map(c => (
                   <div key={c.label} style={{ padding: 14, borderRadius: 8, background: 'var(--bg-elevated)', border: '1px solid var(--border)', textAlign: 'center' }}>
                     <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: c.color, fontFamily: 'monospace' }}>{c.value}</p>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                   <div style={{
                     height: '100%',
                     width: `${org ? Math.round((org.creditUsed / (org.creditLimit || 1)) * 100) : 0}%`,
-                    background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                    background: 'linear-gradient(90deg, var(--primary), #be123c)',
                     borderRadius: 3,
                   }} />
                 </div>
@@ -253,9 +253,9 @@ export default function SettingsPage() {
               )}
               {field('Primary Color',
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <input type="color" defaultValue={org?.primaryColor ?? '#6366f1'} onChange={e => set('primaryColor', e.target.value)}
+                  <input type="color" defaultValue={org?.primaryColor ?? 'var(--primary)'} onChange={e => set('primaryColor', e.target.value)}
                     style={{ width: 40, height: 36, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }} />
-                  <input className="input" defaultValue={org?.primaryColor ?? '#6366f1'} onChange={e => set('primaryColor', e.target.value)} style={{ flex: 1, fontFamily: 'monospace' }} />
+                  <input className="input" defaultValue={org?.primaryColor ?? 'var(--primary)'} onChange={e => set('primaryColor', e.target.value)} style={{ flex: 1, fontFamily: 'monospace' }} />
                 </div>
               )}
               {field('Logo URL',

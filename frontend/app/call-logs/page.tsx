@@ -34,7 +34,7 @@ const STATUS_META: Record<string, { icon: typeof CheckCircle2; color: string; ba
   IN_CALL:   { icon: Radio,        color: '#3b82f6', badge: 'badge badge-blue'   },
   NO_ANSWER: { icon: PhoneMissed,  color: '#6b7280', badge: 'badge badge-gray'   },
   BUSY:      { icon: Phone,        color: '#eab308', badge: 'badge badge-yellow' },
-  INITIATED: { icon: Phone,        color: '#6366f1', badge: 'badge badge-accent' },
+  INITIATED: { icon: Phone,        color: 'var(--primary)', badge: 'badge badge-accent' },
   RINGING:   { icon: Phone,        color: '#f97316', badge: 'badge badge-yellow' },
   PENDING:   { icon: Clock,        color: '#6b7280', badge: 'badge badge-gray'   },
 };
