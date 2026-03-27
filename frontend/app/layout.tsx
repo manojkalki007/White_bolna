@@ -4,6 +4,10 @@ import { AuthProvider } from '@/providers/AuthProvider';
 import Providers from '@/providers/ReactQueryProvider';
 import { ToastProvider } from '@/providers/ToastProvider';
 import AppShell from '@/components/layout/AppShell';
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: 'Cogniflow — Voice AI Platform',
@@ -13,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className={cn("h-full dark", "font-sans", geist.variable)}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

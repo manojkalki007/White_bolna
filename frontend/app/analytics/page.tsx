@@ -6,7 +6,11 @@ import { useAuth } from '@/providers/AuthProvider';
 import {
   Phone, CheckCircle2, Clock, TrendingUp,
   Megaphone, XCircle, PhoneMissed, Zap, ArrowUpRight,
+  Activity, BarChart2, CalendarDays
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AnalyticsData {
   totalCalls: number;
@@ -40,21 +44,20 @@ const STATUS_META: Record<string, { color: string; label: string }> = {
   PENDING:   { color: '#374151', label: 'Pending' },
 };
 
-// Pure CSS sparkline chart (no lib needed)
 function Sparkline({ data }: { data: number[] }) {
   const max = Math.max(...data, 1);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 48, padding: '0 4px' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 64, padding: '0 4px', width: '100%' }}>
       {data.map((v, i) => (
         <div
           key={i}
           style={{
-            flex: 1, borderRadius: '3px 3px 0 0', minWidth: 3,
+            flex: 1, borderRadius: '3px 3px 0 0', minWidth: 4,
             height: `${Math.max((v / max) * 100, 4)}%`,
             background: i === data.length - 1
-              ? 'var(--accent)'
-              : 'rgba(99,102,241,0.3)',
-            transition: 'height 0.3s ease',
+              ? '#6366f1'
+              : 'rgba(99,102,241,0.25)',
+            transition: 'height 0.4s ease',
           }}
         />
       ))}
@@ -62,16 +65,16 @@ function Sparkline({ data }: { data: number[] }) {
   );
 }
 
-// Donut chart (pure SVG)
-function DonutChart({ pct, color = 'var(--accent)' }: { pct: number; color?: string }) {
+function DonutChart({ pct, color = '#6366f1' }: { pct: number; color?: string }) {
   const r = 40; const circ = 2 * Math.PI * r;
   const fill = (pct / 100) * circ;
   return (
-    <svg width={100} height={100} viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={10} />
+    <svg width={110} height={110} viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+      <circle cx={50} cy={50} r={r} fill="none" stroke="var(--bg-elevated)" strokeWidth={12} />
       <circle
-        cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={10}
+        cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={12}
         strokeDasharray={`${fill} ${circ}`} strokeLinecap="round"
+        style={{ transition: 'stroke-dasharray 1s ease-out' }}
       />
     </svg>
   );
@@ -90,58 +93,56 @@ export default function AnalyticsPage() {
     refetchInterval: 30_000,
   });
 
-  // Mock sparkline data (replace with real time-series when available)
   const sparkData = [12, 19, 14, 28, 22, 35, 40, 31, 27, 44, 38, 52, 48, 60, 55, 72, 65, 80, 76, 90];
 
   const statCards = [
     {
-      label: 'Total Calls',
-      value: data?.totalCalls.toLocaleString() ?? '—',
-      icon: Phone,
-      color: '#6366f1',
-      trend: '+12.5%', up: true,
-      sub: 'All time',
+      label: 'Total Calls', value: data?.totalCalls.toLocaleString() ?? '0',
+      icon: Phone, color: '#6366f1', trend: '+12.5%', up: true, sub: 'All time',
     },
     {
-      label: 'Connected',
-      value: data?.completed.toLocaleString() ?? '—',
-      icon: CheckCircle2,
-      color: '#22c55e',
-      trend: `${data?.connectionRate ?? 0}%`, up: true,
-      sub: 'Connection rate',
+      label: 'Connected', value: data?.completed.toLocaleString() ?? '0',
+      icon: CheckCircle2, color: '#22c55e', trend: `${data?.connectionRate ?? 0}%`, up: true, sub: 'Connection rate',
     },
     {
-      label: 'Avg Duration',
-      value: data ? fmtDuration(data.avgDurationSeconds) : '—',
-      icon: Clock,
-      color: '#f97316',
-      trend: '+4.5%', up: true,
-      sub: 'Per completed call',
+      label: 'Avg Duration', value: data ? fmtDuration(data.avgDurationSeconds) : '0s',
+      icon: Clock, color: '#f97316', trend: '+4.5%', up: true, sub: 'Per connected call',
     },
     {
-      label: 'Minutes Used',
-      value: data?.totalMinutesUsed.toFixed(0) ?? '—',
-      icon: Zap,
-      color: '#a855f7',
-      trend: `${data?.totalCampaigns ?? 0} campaigns`, up: true,
-      sub: 'Credits consumed',
+      label: 'Minutes Used', value: data?.totalMinutesUsed.toFixed(0) ?? '0',
+      icon: Zap, color: '#a855f7', trend: `${data?.totalCampaigns ?? 0} campaigns`, up: true, sub: 'Credits consumed',
     },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* ── Page Title ──────────────────────────────────────────────────── */}
+      {/* ── Page Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 className="page-title">Analytics</h1>
-          <p className="page-subtitle">Live overview of all call activity across your campaigns</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+          }}>
+            <BarChart2 size={20} color="white" />
+          </div>
+          <div>
+            <h1 className="page-title" style={{ fontSize: 22 }}>Client Analytics Overview</h1>
+            <p className="page-subtitle">Live health and usage across all your campaigns</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {['Last 7 days','Last 30 days','Last 3 months'].map((label, i) => (
+        <div style={{ display: 'flex', gap: 8, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: 4 }}>
+          {['7D', '30D', '3M'].map((label, i) => (
             <button
               key={label}
-              className={`btn btn-sm ${i === 0 ? 'btn-primary' : 'btn-secondary'}`}
+              className="btn btn-sm"
+              style={{
+                background: i === 0 ? 'rgba(99,102,241,0.15)' : 'transparent',
+                color: i === 0 ? '#818cf8' : 'var(--text-secondary)',
+                border: 'none', fontWeight: 600, padding: '4px 12px',
+              }}
             >
               {label}
             </button>
@@ -149,164 +150,183 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* ── Stat Cards ──────────────────────────────────────────────────── */}
+      {/* ── KPI Cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         {statCards.map((s) => (
-          <div key={s.label} className="stat-card">
-            {/* Glow blob */}
+          <div key={s.label} className="stat-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{
-              position: 'absolute', top: -20, right: -20,
+              position: 'absolute', top: -24, right: -24,
               width: 80, height: 80, borderRadius: '50%',
-              background: s.color, opacity: 0.07, filter: 'blur(12px)',
+              background: s.color, opacity: 0.1, filter: 'blur(16px)',
             }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{
-                width: 36, height: 36, borderRadius: 8,
+                width: 38, height: 38, borderRadius: 10,
                 background: `${s.color}18`, border: `1px solid ${s.color}30`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <s.icon size={16} color={s.color} />
+                <s.icon size={18} color={s.color} />
               </div>
               <span style={{
-                display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 12, fontWeight: 700,
                 color: s.up ? 'var(--green)' : 'var(--red)',
+                background: s.up ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                padding: '4px 8px', borderRadius: 999,
               }}>
-                <ArrowUpRight size={12} />
+                <ArrowUpRight size={12} strokeWidth={3} />
                 {s.trend}
               </span>
             </div>
-            <p className="stat-card-value">
-              {isLoading ? <span style={{ color: 'var(--text-muted)', fontSize: 20 }}>…</span> : s.value}
-            </p>
-            <p className="stat-card-label" style={{ marginTop: 6 }}>{s.label}</p>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.sub}</p>
+            {isLoading ? (
+              <Skeleton style={{ height: 32, width: '60%', background: 'rgba(255,255,255,0.05)' }} />
+            ) : (
+              <p className="stat-card-value" style={{ fontSize: 32 }}>{s.value}</p>
+            )}
+            <div>
+              <p className="stat-card-label" style={{ marginBottom: 2 }}>{s.label}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.sub}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── Chart + Donut row ─────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-
+      {/* ── Charts Row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         {/* Volume Chart */}
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Call Volume</p>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Total calls over time</p>
+        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <CardHeader style={{ padding: '18px 24px 8px', borderBottom: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <CardTitle style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Call Volume & Trend</CardTitle>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>Daily calls dispatched</p>
+              </div>
+              <CalendarDays size={16} color="var(--text-muted)" />
             </div>
-          </div>
-          <div style={{ padding: '16px 20px 8px' }}>
+          </CardHeader>
+          <CardContent style={{ padding: '24px 24px 16px' }}>
             <Sparkline data={sparkData} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map(m => (
-                <span key={m} style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, padding: '0 4px' }}>
+              {['01', '05', '10', '15', '20', '25', '30'].map(d => (
+                <span key={d} style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>{d}</span>
               ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Connection Rate Donut */}
-        <div className="card">
-          <div className="card-header">
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Connected %</p>
-          </div>
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            <div style={{ position: 'relative' }}>
-              <DonutChart pct={data?.connectionRate ?? 0} color="var(--accent)" />
-              <div style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {data?.connectionRate ?? 0}%
-                </span>
-              </div>
-            </div>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Connected</span>
-                <span style={{ color: 'var(--green)', fontWeight: 600 }}>{data?.completed ?? 0}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>No Answer</span>
-                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{data?.noAnswer ?? 0}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Failed</span>
-                <span style={{ color: 'var(--red)', fontWeight: 600 }}>{data?.failed ?? 0}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Status Breakdown Table ─────────────────────────────────────────── */}
-      <div className="card">
-        <div className="card-header">
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-            Call Status Breakdown
-          </p>
-          <span className="badge badge-accent">{data?.statusBreakdown.length ?? 0} statuses</span>
-        </div>
-        {(!data || data.statusBreakdown.length === 0) ? (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-            No call data yet. Launch a campaign to see analytics.
-          </div>
-        ) : (
-          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {data.statusBreakdown.map((b) => {
-              const meta = STATUS_META[b.status] ?? { color: '#6b7280', label: b.status };
-              return (
-                <div key={b.status} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ width: 88, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>
-                    {meta.label}
-                  </span>
-                  <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 3,
-                      width: `${Math.max(b.pct, 1)}%`,
-                      background: meta.color,
-                      transition: 'width 0.6s ease',
-                    }} />
-                  </div>
-                  <span style={{ width: 32, fontSize: 12, fontWeight: 600, color: meta.color, textAlign: 'right', flexShrink: 0 }}>
-                    {b.pct}%
-                  </span>
-                  <span style={{ width: 40, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>
-                    {b.count}
+        {/* Connection Donut */}
+        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <CardHeader style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <CardTitle style={{ fontSize: 14, fontWeight: 600 }}>Connection Rate</CardTitle>
+          </CardHeader>
+          <CardContent style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+            {isLoading ? (
+              <Skeleton style={{ width: 110, height: 110, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <DonutChart pct={data?.connectionRate ?? 0} color="#3b82f6" />
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {data?.connectionRate ?? 0}%
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            )}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Connected', value: data?.completed ?? 0, color: '#22c55e' },
+                { label: 'No Answer', value: data?.noAnswer ?? 0, color: '#6b7280' },
+                { label: 'Failed', value: data?.failed ?? 0, color: '#ef4444' },
+              ].map(st => (
+                <div key={st.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: st.color }} />
+                    <span style={{ color: 'var(--text-secondary)' }}>{st.label}</span>
+                  </div>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{isLoading ? '…' : st.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* ── Quick stats row ───────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        {[
-          { label: 'Avg Latency',  value: `${data?.avgLatencyMs ?? 0} ms`,  icon: Zap,         color: '#f97316', sub: 'Bolna LLM response' },
-          { label: 'Credits Used', value: `${data?.totalCreditCost?.toFixed(2) ?? '0'} min`, icon: TrendingUp, color: '#a855f7', sub: 'This billing cycle' },
-          { label: 'Campaigns',    value: data?.totalCampaigns ?? 0,         icon: Megaphone,   color: '#14b8a6', sub: 'Total launched' },
-        ].map((s) => (
-          <div key={s.label} className="card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-              background: `${s.color}15`, border: `1px solid ${s.color}25`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <s.icon size={18} color={s.color} />
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-                {isLoading ? '…' : String(s.value)}
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>{s.label}</p>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', opacity: 0.6 }}>{s.sub}</p>
-            </div>
-          </div>
-        ))}
+      {/* ── Status Breakdown & Technical Stats ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+        
+        {/* Breakdown Table */}
+        <Card style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <CardHeader style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <CardTitle style={{ fontSize: 14, fontWeight: 600 }}>Status Distribution</CardTitle>
+            <Activity size={14} color="var(--text-muted)" />
+          </CardHeader>
+          <CardContent style={{ padding: '20px 24px' }}>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 20, background: 'rgba(255,255,255,0.05)' }} />)}
+              </div>
+            ) : (!data || data.statusBreakdown.length === 0) ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>No call data available</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {data.statusBreakdown.map((b) => {
+                  const meta = STATUS_META[b.status] ?? { color: '#6b7280', label: b.status };
+                  return (
+                    <div key={b.status} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <span style={{ width: 90, fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                        {meta.label}
+                      </span>
+                      <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 3, background: meta.color,
+                          width: `${Math.max(b.pct, 2)}%`, transition: 'width 0.6s ease'
+                        }} />
+                      </div>
+                      <span style={{ width: 44, fontSize: 12.5, fontWeight: 700, color: meta.color, textAlign: 'right' }}>
+                        {b.pct}%
+                      </span>
+                      <span style={{ width: 40, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>
+                        {b.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Technical Stats Grid */}
+        <div style={{ display: 'grid', gridTemplateRows: 'repeat(3, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Avg Latency', value: `${data?.avgLatencyMs ?? 0} ms`, icon: Zap, color: '#fb923c', desc: 'Bolna Voice LLM latency' },
+            { label: 'Total Campaigns', value: data?.totalCampaigns ?? 0, icon: Megaphone, color: '#a855f7', desc: 'Campaigns dispatched' },
+            { label: 'Credits Consumed', value: `${data?.totalCreditCost?.toFixed(2) ?? '0.00'} min`, icon: TrendingUp, color: '#3b82f6', desc: 'Billing cycle usage' },
+          ].map((s) => (
+            <Card key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
+              <div style={{
+                width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+                background: `${s.color}15`, border: `1px solid ${s.color}25`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <s.icon size={20} color={s.color} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {isLoading ? '…' : String(s.value)}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{s.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— {s.desc}</span>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
       </div>
     </div>
   );

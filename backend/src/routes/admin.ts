@@ -71,6 +71,13 @@ const AdjustCreditsSchema = z.object({
   reason: z.string().optional(),
 });
 
+const CreateUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(['ADMIN', 'USER', 'VIEWER', 'SUPER_ADMIN']).default('ADMIN'),
+});
+
 // ─── GET /api/admin/orgs ──────────────────────────────────────────────────────
 router.get(
   '/orgs',
@@ -291,6 +298,40 @@ router.get(
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: users });
+  })
+);
+
+// ─── POST /api/admin/orgs/:id/users ───────────────────────────────────────────
+router.post(
+  '/orgs/:id/users',
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const parsed = CreateUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: parsed.error.flatten() });
+      return;
+    }
+
+    const { name, email, password, role } = parsed.data;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      res.status(409).json({ success: false, error: 'Email already in use across the platform' });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        role,
+        organizationId: req.params.id,
+      },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    res.status(201).json({ success: true, data: user });
   })
 );
 

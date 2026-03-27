@@ -33,7 +33,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={user.role === 'SUPER_ADMIN' ? 'superadmin' : undefined}>
       <Sidebar />
       <div className="main-content">
         <Header />

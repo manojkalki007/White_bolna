@@ -133,10 +133,15 @@ router.post(
 router.get(
   '/',
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { page = '1', limit = '20', status } = req.query as Record<string, string>;
+    const { page = '1', limit = '20', status, organizationId } = req.query as Record<string, string>;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const where: Record<string, unknown> = { organizationId: req.user!.organizationId };
+    // If Super Admin, they can view all agents, or filter by specific organizationId.
+    // Standard accounts are strictly isolated to their own organizationId.
+    const where: any = req.user!.role === 'SUPER_ADMIN' 
+      ? (organizationId ? { organizationId } : {})
+      : { organizationId: req.user!.organizationId };
+
     if (status) where.status = status;
 
     const [agents, total] = await Promise.all([
@@ -147,6 +152,7 @@ router.get(
         take: parseInt(limit),
         include: {
           _count: { select: { campaigns: true, callLogs: true } },
+          organization: { select: { name: true, brandName: true } } // Show which client owns the agent
         },
       }),
       prisma.bolnaAgent.count({ where }),
