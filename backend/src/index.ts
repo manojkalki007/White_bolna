@@ -17,6 +17,7 @@ import kbRoutes from './routes/kb';
 import adminRoutes from './routes/admin';
 import settingsRoutes from './routes/settings';
 import { errorHandler } from './middleware/errorHandler';
+import { startCallPoller } from './lib/callPoller';
 
 const app = express();
 
@@ -75,6 +76,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Bolna Voice AI API running on http://localhost:${PORT}`);
   console.log(`   Environment : ${process.env.NODE_ENV ?? 'development'}`);
   console.log(`   Bolna Base  : ${process.env.BOLNA_BASE_URL ?? 'https://api.bolna.dev'}`);
+
+  // Start background call status poller (auto-skips in production if webhook secret is set)
+  startCallPoller();
 });
 
 export default app;

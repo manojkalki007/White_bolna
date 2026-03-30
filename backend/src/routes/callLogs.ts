@@ -71,8 +71,8 @@ router.get(
         contact:  true,
         agent:    { select: { name: true, voiceId: true, llmModel: true, bolnaAgentId: true } },
         campaign: { select: { name: true, organizationId: true } },
-      } as any,
-    });
+      },
+    }) as any;
     
     if (!log) throw createError('Call log not found', 404);
     
